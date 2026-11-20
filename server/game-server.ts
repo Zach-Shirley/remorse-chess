@@ -7,6 +7,7 @@ import {
   createInitialState,
   normalizeRules,
   sameRules,
+  serverDice,
   resignGame,
   type GameRules,
   type GameState,
@@ -70,8 +71,10 @@ const DEFAULT_DISCONNECT_GRACE_MS = 30_000;
 
 export function createGameServer(
   httpServer: HttpServer = createHealthServer(),
-  options: { disconnectGraceMs?: number } = {}
+  // `dice` replaces the server's own randomness (tests script it). Clients never supply rolls.
+  options: { disconnectGraceMs?: number; dice?: () => number } = {}
 ) {
+  const dice = options.dice ?? serverDice;
   const rooms = new Map<string, GameRoom>();
   const queue: QueueEntry[] = [];
   const disconnectGraceMs = options.disconnectGraceMs ?? DEFAULT_DISCONNECT_GRACE_MS;
@@ -186,7 +189,8 @@ export function createGameServer(
       }
 
       try {
-        room.game = applyMove(room.game, moveId);
+        // The server rolls every die; the move id is all a client sends.
+        room.game = applyMove(room.game, moveId, dice);
         room.rematchVotes.clear();
         bumpRevision(room);
         ackSuccess(ack, null);

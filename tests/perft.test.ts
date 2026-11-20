@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { START_FEN, fromFen, perft } from "../src/game";
+import { START_FEN, fromFen, perft } from "./plain";
 
 // Reference node counts from the Chess Programming Wiki "Perft Results" page. If a count is
 // off, the move generator is wrong: fix the engine, never the number.

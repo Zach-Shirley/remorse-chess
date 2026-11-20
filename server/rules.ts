@@ -5,9 +5,11 @@
 // still going; anything else, a win or a draw, means it is finished) and `currentPlayer`.
 // The state itself is sent to both clients as-is, so it must stay plain JSON.
 //
-// The engine is deterministic and has no clock. A variant that needs randomness or time should
-// take them as arguments here (for example wrap applyMove to pass `Math.random` or `Date.now()`
-// into the engine) so the server stays the single authority and the engine stays testable.
+// The engine has no randomness of its own: applyMove takes the dice as an argument. For online
+// games the server is the only one that rolls (serverDice below), so neither player can choose
+// or predict a result, and both clients receive the rolls inside the game state's move log.
+import { randomInt } from "node:crypto";
+
 export {
   applyMove,
   createInitialState,
@@ -19,7 +21,12 @@ export {
 } from "../src/game";
 import { normalizeRules, type GameRules } from "../src/game";
 
-// Quick match only pairs players who asked for the same rules.
+// Numbers in [0, 1) from the operating system's secure generator, shaped like Math.random.
+export function serverDice(): number {
+  return randomInt(0, 1_000_000) / 1_000_000;
+}
+
+// Quick match only pairs players who asked for the same rules (the same rule set).
 export function sameRules(a: GameRules, b: GameRules): boolean {
   return JSON.stringify(normalizeRules(a)) === JSON.stringify(normalizeRules(b));
 }

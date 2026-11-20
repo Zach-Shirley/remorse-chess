@@ -1,10 +1,29 @@
-// Chess rules engine. Pure TypeScript: no UI, no DOM, no randomness, no clock.
+// Remorse Chess rules engine. Pure TypeScript: no UI, no DOM, no clock, and no randomness of
+// its own (dice are passed in to applyMove).
 //
-// Move generation is two layers so a variant can recombine them:
+// Move generation is two layers of standard chess:
 //   1. getPseudoLegalMoves  - how each piece moves, ignoring check entirely
 //   2. isLegalMove          - the check rules, built on isSquareAttacked
-// generateLegalMoves = layer 1 filtered by layer 2. A variant changes `variantOptions` below
-// (or the two layers themselves) and the shell, the bot and the server follow.
+// generateLegalMoves = layer 1 filtered by layer 2. Remorse Chess plugs into both through
+// `variantOptions` (who may move, capture and give check) and into makeMove through
+// src/variant/remorse.ts (what a capture does to the pieces' consciences).
+
+import {
+  DEFAULT_RULE_SET,
+  MODEL_DICE,
+  REMORSE_OPTIONS,
+  RULE_SETS,
+  declineExtraMove,
+  mindSignature,
+  resolveMove,
+  type GameEvent,
+  type Minds,
+  type Rng,
+  type RuleSet
+} from "./variant/remorse";
+import { EXTRA_MOVE_IS_OPTIONAL } from "./variant/interpretation";
+
+export type { GameEvent, Mind, Minds, Rng, RuleSet } from "./variant/remorse";
 
 export const BOARD_SIZE = 8;
 
@@ -65,6 +84,12 @@ export type MoveLogEntry = {
   promotion?: PromotionKind;
   rook?: { pieceId: string; from: Square; to: Square };
   check: boolean;
+  // Everything the move set off: dice rolls, absolutions, pieces lost to despair.
+  events: GameEvent[];
+  // A Sadist's extra move: the same player's second move of the turn.
+  extra?: boolean;
+  // The captured piece was the mover's own (bloodlust).
+  friendlyFire?: boolean;
 };
 
 export type DrawReason = "stalemate" | "threefold-repetition" | "fifty-move" | "insufficient-material";
@@ -79,7 +104,8 @@ export type GameStatus =
   | {
       phase: "won";
       winner: Player;
-      reason: "checkmate" | "resignation";
+      // "despair": the loser's devastated king removed itself.
+      reason: "checkmate" | "resignation" | "despair";
       message: string;
     }
   | {
@@ -88,17 +114,23 @@ export type GameStatus =
       message: string;
     };
 
-// Options a game is created with. Plain chess has none; a variant adds its switches here,
-// gives them defaults in DEFAULT_GAME_RULES and sanitises them in normalizeRules.
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export type GameRules = {};
+// Options a game is created with.
+export type GameRules = {
+  // Which of the creator's rule layers are in play. See src/variant/remorse.ts.
+  ruleSet: RuleSet;
+};
 
-export const DEFAULT_GAME_RULES: GameRules = {};
+export const DEFAULT_GAME_RULES: GameRules = { ruleSet: DEFAULT_RULE_SET };
+
+// Standard chess, with no remorse at all. Not offered in the app: the standard-chess and perft
+// tests run under it.
+export const PLAIN_CHESS_RULES: GameRules = { ruleSet: "plain" };
 
 // Sanitises rules that came from storage or from another player's client.
 export function normalizeRules(rules: unknown): GameRules {
-  void rules;
-  return {};
+  const wanted = (rules as { ruleSet?: unknown } | null | undefined)?.ruleSet;
+  const ruleSet = RULE_SETS.find((name) => name === wanted) ?? DEFAULT_RULE_SET;
+  return { ruleSet };
 }
 
 export type CastlingRights = Record<Player, { kingSide: boolean; queenSide: boolean }>;
@@ -117,6 +149,15 @@ export type GameState = {
   rules: GameRules;
   moveLog: MoveLogEntry[];
   status: GameStatus;
+  // The consciences of the pieces that have one, by piece id.
+  minds: Minds;
+  // Set while a Sadist's extra move is pending: `currentPlayer` has captured and may move once
+  // more with that piece (pieceId null: with any piece), or end the turn with PASS_MOVE_ID.
+  extraMove: { pieceId: string | null } | null;
+  // What the most recent action set off, and how many actions there have been (so the UI can
+  // tell fresh events from ones it has already shown).
+  lastEvents: GameEvent[];
+  actionCount: number;
 };
 
 export type LocatedPiece = {
@@ -138,8 +179,12 @@ export type AttackOptions = {
 export type MoveGenOptions = {
   // Which enemy pieces `attacker` may capture. Default: any enemy piece.
   canCapture?: (attacker: Piece, target: Piece, at: Square, state: GameState) => boolean;
+  // Which of its own side's pieces `attacker` may capture. Default: none.
+  canCaptureFriendly?: (attacker: Piece, target: Piece, at: Square, state: GameState) => boolean;
   // Which pieces may move at all. Default: every piece.
   canMove?: (piece: Piece, from: Square, state: GameState) => boolean;
+  // Pieces that may only make capturing moves. Default: none.
+  capturesOnly?: (piece: Piece, from: Square, state: GameState) => boolean;
   // Only captures and promotions (used by the bot's quiescence search).
   tacticalOnly?: boolean;
 };
@@ -153,10 +198,13 @@ export type LegalityOptions = {
 
 // THE VARIANT SEAM. Everything that asks "what is legal here?" (getLegalMoves, applyMove, the
 // status after each move, the bot) goes through these options. Plain chess uses the defaults.
+const PLAIN_OPTIONS: LegalityOptions = {};
 export function variantOptions(state: GameState): LegalityOptions {
-  void state;
-  return {};
+  return state.rules.ruleSet === "plain" ? PLAIN_OPTIONS : REMORSE_OPTIONS;
 }
+
+// The move id that ends a Sadist's pending extra move without making it.
+export const PASS_MOVE_ID = "pass";
 
 // ---------------------------------------------------------------------------------------------
 // Setup
@@ -222,7 +270,11 @@ export function fromFen(fen: string, rules: GameRules = DEFAULT_GAME_RULES): Gam
     positionCounts: {},
     rules,
     moveLog: [],
-    status: PLAYING
+    status: PLAYING,
+    minds: {},
+    extraMove: null,
+    lastEvents: [],
+    actionCount: 0
   };
   state.positionCounts = { [positionKey(state)]: 1 };
   return { ...state, status: evaluateStatus(state) };
@@ -285,6 +337,16 @@ export function getPseudoLegalMovesForPiece(state: GameState, from: Square, opti
 
 function addPieceMoves(state: GameState, piece: Piece, row: number, col: number, options: MoveGenOptions, out: Move[]) {
   if (options.canMove && !options.canMove(piece, { row, col }, state)) return;
+  if (options.capturesOnly && options.capturesOnly(piece, { row, col }, state)) {
+    const all: Move[] = [];
+    addPieceMovesOfKind(state, piece, row, col, options, all);
+    for (const move of all) if (move.captures.length > 0) out.push(move);
+    return;
+  }
+  addPieceMovesOfKind(state, piece, row, col, options, out);
+}
+
+function addPieceMovesOfKind(state: GameState, piece: Piece, row: number, col: number, options: MoveGenOptions, out: Move[]) {
   switch (piece.kind) {
     case "pawn":
       addPawnMoves(state, piece, row, col, options, out);
@@ -331,7 +393,9 @@ function makeMoveRecord(
 }
 
 function mayCapture(state: GameState, piece: Piece, target: Piece, row: number, col: number, options: MoveGenOptions) {
-  if (target.player === piece.player) return false;
+  if (target.player === piece.player) {
+    return options.canCaptureFriendly ? options.canCaptureFriendly(piece, target, { row, col }, state) : false;
+  }
   return options.canCapture ? options.canCapture(piece, target, { row, col }, state) : true;
 }
 
@@ -531,7 +595,8 @@ export function isLegalMove(state: GameState, move: Move, options: AttackOptions
     const transit = { row: move.from.row, col: (move.from.col + move.to.col) / 2 };
     if (isSquareAttacked(state, transit, enemy, options)) return false;
   }
-  const next = makeMove(state, move);
+  // The bare board move is enough: no die can make an enemy piece more dangerous to the king.
+  const next = makeBoardMove(state, move);
   const king = move.pieceKind === "king" ? move.to : findKing(next, move.player);
   return king ? !isSquareAttacked(next, king, enemy, options) : true;
 }
@@ -563,8 +628,33 @@ export function getLegalMoves(state: GameState, player: Player = state.currentPl
 const PLAYING: GameStatus = { phase: "playing", check: false, message: "" };
 
 // Plays a pseudo-legal move with no legality check, no move log, no repetition count and no
-// status. This is the fast path for search (the bot) and for the legality filter itself.
-export function makeMove(state: GameState, move: Move): GameState {
+// status (except a win by despair). This is the fast path for search (the bot). The pieces'
+// reactions are resolved with `rng`; without one the dice follow the documented model
+// (MODEL_DICE: every die shows 3), which keeps the search deterministic.
+// After a Sadist's capture the returned state may still have the same player to move.
+export function makeMove(state: GameState, move: Move, rng: Rng = MODEL_DICE): GameState {
+  const moved = makeBoardMove(state, move);
+  if (state.rules.ruleSet === "plain") return moved;
+  return resolveMove(state, moved, move, rng, null, hasAnyLegalMove);
+}
+
+function hasAnyLegalMove(state: GameState): boolean {
+  return generateLegalMoves(state).length > 0;
+}
+
+// Ends a pending Sadist extra move without making it (search fast path; see applyMove).
+export function passExtraMove(state: GameState): GameState {
+  if (!state.extraMove) throw new Error("There is no extra move to decline");
+  return declineExtraMove(state, null);
+}
+
+// True when the side to move may end the turn instead of making the Sadist's extra move.
+export function canPass(state: GameState): boolean {
+  return state.status.phase === "playing" && state.extraMove !== null && EXTRA_MOVE_IS_OPTIONAL;
+}
+
+// Standard chess only: moves the pieces and updates castling, en passant and the clocks.
+export function makeBoardMove(state: GameState, move: Move): GameState {
   const board = state.board.slice();
   const touch = (row: number) => {
     if (board[row] === state.board[row]) board[row] = board[row].slice();
@@ -620,26 +710,53 @@ export function makeMove(state: GameState, move: Move): GameState {
 }
 
 // Plays one legal move for the side to move and returns the new state (the input is not changed).
-export function applyMove(state: GameState, moveId: string): GameState {
+// `rng` supplies the dice (see Rng); every roll is recorded in the move log. Without it the dice
+// follow MODEL_DICE, which is only right for the bot's look-ahead and for dice-free rule sets.
+// PASS_MOVE_ID ends a pending Sadist extra move.
+export function applyMove(state: GameState, moveId: string, rng: Rng = MODEL_DICE): GameState {
+  const events: GameEvent[] = [];
+
+  if (moveId === PASS_MOVE_ID) {
+    if (!canPass(state)) throw new Error(`Illegal move: ${moveId}`);
+    const passed = declineExtraMove(state, events);
+    const next: GameState = {
+      ...passed,
+      positionCounts: { [positionKey(passed)]: 1 },
+      lastEvents: events,
+      actionCount: state.actionCount + 1
+    };
+    // Pieces lost at the turn change belong to the move that ended the turn.
+    const moveLog = state.moveLog.slice();
+    const last = moveLog[moveLog.length - 1];
+    if (last && events.length > 0) moveLog[moveLog.length - 1] = { ...last, events: [...last.events, ...events] };
+    return { ...next, moveLog, status: passed.status.phase === "won" ? passed.status : evaluateStatus(next) };
+  }
+
   const legalMoves = getLegalMoves(state);
   const move = legalMoves.find((candidate) => candidate.id === moveId);
   if (!move) throw new Error(`Illegal move: ${moveId}`);
 
-  const captured = move.captures
-    .map((capture) => state.board[capture.row][capture.col]?.kind)
-    .filter((kind): kind is PieceKind => Boolean(kind));
+  const victims = move.captures
+    .map((capture) => state.board[capture.row][capture.col])
+    .filter((piece): piece is Piece => Boolean(piece));
+  const captured = victims.map((piece) => piece.kind);
 
-  const moved = makeMove(state, move);
-  const irreversible = move.pieceKind === "pawn" || captured.length > 0;
+  const moved =
+    state.rules.ruleSet === "plain"
+      ? makeBoardMove(state, move)
+      : resolveMove(state, makeBoardMove(state, move), move, rng, events, hasAnyLegalMove);
+  const irreversible =
+    move.pieceKind === "pawn" || captured.length > 0 || events.some((event) => event.type === "removed");
   const key = positionKey(moved);
   const positionCounts = irreversible
     ? { [key]: 1 }
     : { ...state.positionCounts, [key]: (state.positionCounts[key] ?? 0) + 1 };
 
-  const next: GameState = { ...moved, positionCounts };
-  const status = evaluateStatus(next);
-  const check = status.phase === "playing" ? status.check : status.phase === "won";
-  const suffix = status.phase === "won" ? "#" : check ? "+" : "";
+  const next: GameState = { ...moved, positionCounts, lastEvents: events, actionCount: state.actionCount + 1 };
+  const status = moved.status.phase === "won" ? moved.status : evaluateStatus(next);
+  const turnPassed = next.currentPlayer !== move.player;
+  const check = turnPassed && (status.phase === "playing" ? status.check : status.phase === "won" && status.reason === "checkmate");
+  const suffix = status.phase === "won" && status.reason === "checkmate" ? "#" : check ? "+" : "";
 
   const entry: MoveLogEntry = {
     turn: state.fullmoveNumber,
@@ -650,10 +767,13 @@ export function applyMove(state: GameState, moveId: string): GameState {
     to: move.to,
     captured,
     notation: sanWithoutSuffix(move, legalMoves) + suffix,
-    check
+    check,
+    events
   };
   if (move.promotion) entry.promotion = move.promotion;
   if (move.rook) entry.rook = move.rook;
+  if (state.extraMove) entry.extra = true;
+  if (victims.some((piece) => piece.player === move.player)) entry.friendlyFire = true;
 
   return { ...next, moveLog: [...state.moveLog, entry], status };
 }
@@ -685,6 +805,11 @@ export function evaluateStatus(state: GameState): GameStatus {
   const options = variantOptions(state);
   const check = options.checkRules === false ? false : isInCheck(state, player, options.attacks ?? {});
   const hasMove = generateLegalMoves(state, player).length > 0;
+
+  // A Sadist's extra move is pending: the turn is not over, so nothing else is judged yet.
+  if (state.extraMove && hasMove) {
+    return { phase: "playing", check, message: `${playerName(player)}'s Sadist may move again` };
+  }
 
   if (!hasMove && check) {
     const winner = opponentOf(player);
@@ -738,7 +863,12 @@ export function positionKey(state: GameState): string {
     for (let col = 0; col < BOARD_SIZE; col += 1) {
       const piece = state.board[row][col];
       if (!piece) key += ".";
-      else key += piece.player === "white" ? KIND_LETTERS[piece.kind].toUpperCase() : KIND_LETTERS[piece.kind];
+      else {
+        key += piece.player === "white" ? KIND_LETTERS[piece.kind].toUpperCase() : KIND_LETTERS[piece.kind];
+        // The same placement with different consciences is a different position.
+        const mind = state.minds[piece.id];
+        if (mind) key += mindSignature(mind);
+      }
     }
   }
   key += state.currentPlayer === "white" ? " w " : " b ";
@@ -888,7 +1018,10 @@ export function getMaterial(state: GameState): Material {
     }
   }
   const captured: Record<Player, PieceKind[]> = { white: [], black: [] };
-  for (const entry of state.moveLog) captured[entry.player].push(...entry.captured);
+  for (const entry of state.moveLog) {
+    // A bloodlust capture of the mover's own piece is nobody's trophy.
+    if (!entry.friendlyFire) captured[entry.player].push(...entry.captured);
+  }
   return { score, captured };
 }
 
@@ -898,7 +1031,7 @@ export function perft(state: GameState, depth: number): number {
   const moves = generateLegalMoves(state);
   if (depth === 1) return moves.length;
   let nodes = 0;
-  for (const move of moves) nodes += perft(makeMove(state, move), depth - 1);
+  for (const move of moves) nodes += perft(makeBoardMove(state, move), depth - 1);
   return nodes;
 }
 

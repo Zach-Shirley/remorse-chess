@@ -18,7 +18,7 @@ import {
   squareName,
   toFen,
   type GameState
-} from "../src/game";
+} from "./plain";
 
 function play(state: GameState, ...moveIds: string[]) {
   return moveIds.reduce((current, moveId) => applyMove(current, moveId), state);
@@ -87,9 +87,9 @@ describe("setup", () => {
     expect(ids(copy)).toEqual(ids(state));
   });
 
-  it("normalises rules to the plain chess options", () => {
-    expect(normalizeRules({ anything: true })).toEqual({});
-    expect(normalizeRules(undefined)).toEqual({});
+  it("normalises rules to a rule set", () => {
+    expect(normalizeRules({ anything: true })).toEqual({ ruleSet: "reactions" });
+    expect(normalizeRules(undefined)).toEqual({ ruleSet: "reactions" });
   });
 });
 

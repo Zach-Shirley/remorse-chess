@@ -7,7 +7,7 @@ function snapshotWith(chatTexts: string[]): RoomSnapshot {
   return {
     code: "ABC123",
     stage: "playing",
-    rules: {},
+    rules: { ruleSet: "reactions" },
     game: createInitialState(),
     players: {
       white: { name: "anything a stranger typed", player: "white", connected: true, isHost: true },

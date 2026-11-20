@@ -54,7 +54,7 @@ describe("multiplayer game server", () => {
     const blackClient = await newClient();
     const whiteConnection = await createRoom(whiteClient, {
       name: "SwiftFalcon27",
-      rules: {}
+      rules: { ruleSet: "reactions" }
     });
     const whiteJoinedState = waitForState(
       whiteClient,
@@ -86,7 +86,7 @@ describe("multiplayer game server", () => {
     const blackClient = await newClient();
     const whiteConnection = await createRoom(whiteClient, {
       name: "Host",
-      rules: {}
+      rules: { ruleSet: "reactions" }
     });
     const blackConnection = await joinRoom(blackClient, {
       name: "Guest",
@@ -129,7 +129,7 @@ describe("multiplayer game server", () => {
     const blackClient = await newClient();
     const room = await createRoom(whiteClient, {
       name: "White",
-      rules: {}
+      rules: { ruleSet: "reactions" }
     });
     await joinRoom(blackClient, { name: "Black", code: room.snapshot.code });
 
@@ -158,7 +158,7 @@ describe("multiplayer game server", () => {
     const blackClient = await newClient();
     const room = await createRoom(whiteClient, {
       name: "White",
-      rules: {}
+      rules: { ruleSet: "reactions" }
     });
     await joinRoom(blackClient, { name: "Black", code: room.snapshot.code });
 
@@ -190,7 +190,7 @@ describe("multiplayer game server", () => {
   it("plays a game to checkmate and rejects moves afterwards", async () => {
     const whiteClient = await newClient();
     const blackClient = await newClient();
-    const room = await createRoom(whiteClient, { name: "White", rules: {} });
+    const room = await createRoom(whiteClient, { name: "White", rules: { ruleSet: "reactions" } });
     await joinRoom(blackClient, { name: "Black", code: room.snapshot.code });
 
     // Fool's mate.
@@ -208,7 +208,7 @@ describe("multiplayer game server", () => {
   it("rejects an illegal move without changing the game", async () => {
     const whiteClient = await newClient();
     const blackClient = await newClient();
-    const room = await createRoom(whiteClient, { name: "White", rules: {} });
+    const room = await createRoom(whiteClient, { name: "White", rules: { ruleSet: "reactions" } });
     const joined = await joinRoom(blackClient, { name: "Black", code: room.snapshot.code });
 
     expect(await move(whiteClient, "e2e5")).toEqual({ ok: false, message: "That move is no longer legal." });
@@ -221,7 +221,7 @@ describe("multiplayer game server", () => {
   it("finishes the room on a draw and allows a rematch", async () => {
     const whiteClient = await newClient();
     const blackClient = await newClient();
-    const room = await createRoom(whiteClient, { name: "White", rules: {} });
+    const room = await createRoom(whiteClient, { name: "White", rules: { ruleSet: "reactions" } });
     await joinRoom(blackClient, { name: "Black", code: room.snapshot.code });
 
     // Both sides shuffle their knights until the start position has occurred three times.
@@ -248,7 +248,7 @@ describe("multiplayer game server", () => {
     const room = await createRoom(whiteClient, {
       name: "anything typed",
       playerId: "1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed",
-      rules: {}
+      rules: { ruleSet: "reactions" }
     });
     const joined = await joinRoom(blackClient, { name: "CalmHeron31", code: room.snapshot.code });
 
@@ -262,7 +262,7 @@ describe("multiplayer game server", () => {
     const blackClient = await newClient();
     const room = await createRoom(whiteClient, {
       name: "White",
-      rules: {}
+      rules: { ruleSet: "reactions" }
     });
     await joinRoom(blackClient, { name: "Black", code: room.snapshot.code });
 
@@ -291,7 +291,7 @@ describe("multiplayer game server", () => {
     const blackClient = await newClient();
     const room = await createRoom(whiteClient, {
       name: "White",
-      rules: {}
+      rules: { ruleSet: "reactions" }
     });
     await joinRoom(blackClient, { name: "Black", code: room.snapshot.code });
 
@@ -317,7 +317,7 @@ describe("multiplayer game server", () => {
     const secondClient = await newClient();
     const payload: MatchmakingPayload = {
       name: "Queued White",
-      rules: {}
+      rules: { ruleSet: "reactions" }
     };
 
     expect(await joinMatchmaking(firstClient, payload)).toEqual({
@@ -343,7 +343,7 @@ describe("multiplayer game server", () => {
     const guestClient = await newClient();
     const room = await createRoom(hostClient, {
       name: "CalmHeron31",
-      rules: {},
+      rules: { ruleSet: "reactions" },
       color: "black"
     });
     expect(room.session.player).toBe("black");

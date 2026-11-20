@@ -8,7 +8,7 @@ import {
   getMaterial,
   type GameState,
   type Player
-} from "../src/game";
+} from "./plain";
 
 function seeded(seed: number) {
   return () => ((seed = (seed * 16807) % 2147483647) / 2147483647);

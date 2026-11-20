@@ -10,11 +10,11 @@ The variant is by **Bardelo Bardalini**, who published it in five YouTube Shorts
 
 The first online connection can take up to a minute: the multiplayer server runs on a free tier and sleeps when nobody is playing. Pass & Play and the bot work instantly and offline.
 
-![The home screen](docs/screenshots/desktop-1-home.png)
+![The home screen](docs/screenshots/desktop-1-home.webp)
 
 | A capture, the capturer's roll and a witness's vendetta | A guilt-ridden pawn, explained | A Sadist that may move again |
 |---|---|---|
-| ![Roll card](docs/screenshots/desktop-5-roll-card.png) | ![Guilt-ridden](docs/screenshots/phone-5b-guilt-ridden.png) | ![Sadist](docs/screenshots/desktop-5d-sadist-extra-move.png) |
+| ![Roll card](docs/screenshots/desktop-5-roll-card.webp) | ![Guilt-ridden](docs/screenshots/phone-5b-guilt-ridden.webp) | ![Sadist](docs/screenshots/desktop-5d-sadist-extra-move.webp) |
 
 The screenshots are made by `node scripts/tour-screenshots.mjs http://localhost:4274 docs/screenshots`.
 
@@ -126,7 +126,7 @@ For repeatable checks, a pass-and-play game can be opened directly with a rule s
 
 ## Verification
 
-**Automated (`npm test`, TEST_COUNT tests, all passing):**
+**Automated (`npm test`, 201 tests, all passing):**
 
 - `tests/remorse.test.ts`, with scripted dice: each face of the capture die; that a reaction is rolled once and returns after later captures; that guilt-ridden and devastated pieces cannot capture and give no check (including castling past one); absolution by an arriving bishop, by a promotion to bishop, and not by a stationary bishop, a guilt-ridden bishop or an enemy bishop; the bishop's own one-turn penance; the no-bishop lockout; the devastation countdown and self-removal, including a king (which loses the game); the Sadist's extra move (optional, same piece, no stacking, move numbering); bloodlust (capture-only, friendly captures, never a king); every face of the witness die, doubling to devastated, vendetta typing, Sadist immunity, en passant witnesses; how Classic, Reactions and Witnesses differ; checkmate and stalemate under these rules.
 - `tests/remorse-bot.test.ts`: 36 random games across the three rule sets checked for consistency after every move; the bot returns legal actions (including ending a turn), takes material with an extra move, saves a devastated king, beats a weaker level with real dice, and answers within 1.5 seconds.

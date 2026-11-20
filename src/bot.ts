@@ -21,6 +21,7 @@ import {
   isInCheck,
   makeMove,
   passExtraMove,
+  variantOptions,
   type GameState,
   type Move,
   type PieceKind,
@@ -167,8 +168,9 @@ class Search {
     const moves = generateLegalMoves(state);
     const pending = state.extraMove !== null;
     if (moves.length === 0 && !pending) {
-      // Checkmate, scored so faster mates are preferred; otherwise stalemate.
-      return inCheck ? -WIN_SCORE + ply : 0;
+      // Checkmate, scored so faster mates are preferred; otherwise stalemate. Without check rules
+      // (the king is captured, not mated) having no move is always stalemate.
+      return inCheck && variantOptions(state).checkRules !== false ? -WIN_SCORE + ply : 0;
     }
 
     const children = orderChildren(state, moves, depth >= 2);
@@ -230,6 +232,8 @@ function orderingScore(state: GameState, move: Move): number {
     const victim = state.board[capture.row][capture.col];
     // Bloodlust: taking one's own piece is tried last.
     if (victim && victim.player === move.player) score -= 5_000 + PIECE_VALUE[victim.kind];
+    // Taking the king ends the game (Remorse Chess wins by king capture): always try it first.
+    else if (victim?.kind === "king") score += 1_000_000;
     else score += 10_000 + (victim ? PIECE_VALUE[victim.kind] : 0) * 10 - PIECE_VALUE[move.pieceKind];
   }
   if (move.promotion) score += 8_000 + PIECE_VALUE[move.promotion];

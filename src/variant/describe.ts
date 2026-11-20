@@ -74,7 +74,7 @@ export function describeMind(mind: Mind | undefined, kind: PieceKind): string[] 
       lines.push("Guilt-ridden: it refuses to capture, and absolves itself once your next turn is over.");
     } else {
       lines.push(
-        `Guilt-ridden${mind.temporary ? " (as a witness)" : ""}: it moves but refuses to capture and gives no check, until a friendly bishop lands next to it.`
+        `Guilt-ridden${mind.temporary ? " (as a witness)" : ""}: it moves but refuses to capture, until a friendly bishop is next to it.`
       );
     }
   }

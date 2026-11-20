@@ -27,9 +27,11 @@ import {
   KINGS_ROLL,
   PROMOTION_TO_BISHOP_ABSOLVES,
   REACTION_RECURS,
+  STANDING_BISHOP_ABSOLVES,
   VENDETTA_AGAINST_KING_GIVES_CHECK,
   VENDETTA_CAPTURE_ROLLS,
   VENDETTA_IGNORES_GUILT,
+  WIN_BY_KING_CAPTURE,
   adjacentSquares,
   bloodlustMayCaptureFriend,
   vendettaTarget
@@ -119,6 +121,9 @@ export type Mind = {
   turnsLeft?: number;
   // A guilt-ridden bishop: ends of its owner's turns left until it absolves itself.
   penance?: number;
+  // Afflicted during its owner's current turn, so a bishop standing beside it cannot absolve it
+  // until the end of the owner's next turn.
+  fresh?: boolean;
   // Captures this piece has made (a Sadist gains bloodlust at three).
   captures?: number;
   bloodlust?: boolean;
@@ -180,6 +185,8 @@ export function withMind(state: GameState, square: Square, mind: Mind): GameStat
 // The engine's two move-generation layers, recombined. Every callback reads the state it is
 // handed (never a captured one), so this object is built once.
 export const REMORSE_OPTIONS: LegalityOptions = {
+  // Zach's change: the king is captured, not checkmated, so there are no check rules.
+  checkRules: WIN_BY_KING_CAPTURE ? false : undefined,
   moves: {
     // VERIFIED (video 2): a devastated piece is immobilised. During a Sadist's extra move only
     // the Sadist may move.
@@ -191,7 +198,7 @@ export const REMORSE_OPTIONS: LegalityOptions = {
     // VERIFIED (video 1): a guilt-ridden piece refuses to capture. (video 5): a vendetta is one
     // guilt-free capture against one piece type.
     canCapture: (attacker, target, _at, state) => {
-      if (target.kind === "king") return false;
+      if (target.kind === "king" && !WIN_BY_KING_CAPTURE) return false;
       const mind = state.minds[attacker.id];
       if (!mind || !mind.affliction) return true;
       return VENDETTA_IGNORES_GUILT && mind.affliction === "guilty" && mind.vendetta === target.kind;
@@ -223,6 +230,7 @@ function refOf(piece: Piece, square: Square): PieceRef {
 
 function clearAffliction(mind: Mind) {
   delete mind.affliction;
+  delete mind.fresh;
   delete mind.temporary;
   delete mind.turnsLeft;
   delete mind.penance;
@@ -233,6 +241,7 @@ function clearAffliction(mind: Mind) {
 function afflict(mind: Mind, piece: Piece, affliction: Affliction, temporary: boolean, mover: Player) {
   const ownTurn = piece.player === mover ? 1 : 0;
   mind.affliction = affliction;
+  if (ownTurn) mind.fresh = true;
   if (temporary) mind.temporary = true;
   else delete mind.temporary;
   delete mind.turnsLeft;
@@ -271,6 +280,22 @@ export function resolveMove(
     minds[id] = mind;
     return mind;
   };
+
+  // Zach's change: capturing the enemy king wins on the spot. Nobody rolls for it.
+  if (victim && victim.kind === "king" && victim.player !== mover) {
+    if (minds[victim.id]) {
+      edit(victim.id);
+      delete minds[victim.id];
+    }
+    const winner = mover === "white" ? "White" : "Black";
+    const loser = mover === "white" ? "Black" : "White";
+    return {
+      ...moved,
+      minds,
+      extraMove: null,
+      status: { phase: "won", winner: mover, reason: "king-captured", message: `${winner} captured ${loser}'s king` }
+    };
+  }
 
   let earnedExtraMove = false;
 
@@ -419,13 +444,14 @@ export function declineExtraMove(state: GameState, events: GameEvent[] | null): 
 }
 
 // The end of `mover`'s turn. `state.currentPlayer` is already the opponent.
+//  - the mover's afflicted pieces with a healthy friendly bishop beside them are absolved;
 //  - the mover's guilt-ridden bishops do their penance and their devastated pieces tick down;
 //  - the opponent's devastated pieces whose time is up remove themselves before the opponent moves.
 function finishTurn(state: GameState, mover: Player, events: GameEvent[] | null): GameState {
   let timers = false;
   for (const id in state.minds) {
     const mind = state.minds[id];
-    if (mind.turnsLeft !== undefined || mind.penance !== undefined) {
+    if (mind.turnsLeft !== undefined || mind.penance !== undefined || mind.affliction || mind.fresh) {
       timers = true;
       break;
     }
@@ -451,6 +477,16 @@ function finishTurn(state: GameState, mover: Player, events: GameEvent[] | null)
       if (!mind) continue;
 
       if (piece.player === mover) {
+        // A bishop standing beside an afflicted piece absolves it (see interpretation.ts).
+        if (STANDING_BISHOP_ABSOLVES && mind.affliction && !mind.fresh) {
+          const bishop = standingAbsolver(state, minds, piece, { row, col });
+          if (bishop && (mind.affliction !== "devastated" || ABSOLUTION_CLEARS_DEVASTATION)) {
+            clearAffliction(edit(piece.id));
+            events?.push({ type: "absolved", by: bishop, pieces: [refOf(piece, { row, col })] });
+            continue;
+          }
+        }
+        if (mind.fresh) delete edit(piece.id).fresh;
         if (mind.penance !== undefined) {
           const next = edit(piece.id);
           next.penance = mind.penance - 1;
@@ -488,6 +524,17 @@ function finishTurn(state: GameState, mover: Player, events: GameEvent[] | null)
 
   if (minds === state.minds && board === state.board) return state;
   return { ...state, minds, board, status, halfmoveClock: removedAny ? 0 : state.halfmoveClock };
+}
+
+// A healthy friendly bishop next to `piece` (not the piece itself), or null.
+function standingAbsolver(state: GameState, minds: Minds, piece: Piece, at: Square): PieceRef | null {
+  for (const square of adjacentSquares(at)) {
+    const other = state.board[square.row][square.col];
+    if (!other || other.kind !== "bishop" || other.player !== piece.player || other.id === piece.id) continue;
+    if (ABSOLVER_MUST_BE_HEALTHY && minds[other.id]?.affliction) continue;
+    return refOf(other, square);
+  }
+  return null;
 }
 
 // A compact signature of a mind, for telling repeated positions apart.

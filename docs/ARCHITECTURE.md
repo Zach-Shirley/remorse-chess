@@ -48,9 +48,9 @@ The client, the bot and the server all run the same `src/game.ts`, so they canno
 | `extraMove` | set while a Sadist's extra move is pending: the same player is still to move |
 | `moveLog` | one entry per move, with its SAN `notation` and the `events` it set off |
 | `lastEvents`, `actionCount` | what the latest action set off, and a counter so the UI shows each event once |
-| `status` | playing / won (`checkmate`, `resignation`, `despair`) / draw |
+| `status` | playing / won (`king-captured`, `resignation`, `despair`; `checkmate` only when `WIN_BY_KING_CAPTURE` is off) / draw |
 
-A `Mind` holds `reaction` (the lifelong die result), `affliction` (`guilty` or `devastated`), `temporary` (it came from witnessing), `turnsLeft` (devastation countdown), `penance` (a bishop's self-absolution), `captures`, `bloodlust` and `vendetta` (a piece kind).
+A `Mind` holds `reaction` (the lifelong die result), `affliction` (`guilty` or `devastated`), `temporary` (it came from witnessing), `turnsLeft` (devastation countdown), `penance` (a bishop's self-absolution), `fresh` (afflicted during its owner's current turn, so a standing bishop waits a turn), `captures`, `bloodlust` and `vendetta` (a piece kind).
 
 A `GameEvent` is one of: `roll` (cause `capture` or `witness`, with the piece, the value and the outcome), `relapse` (guilt or devastation without a die), `absolved`, `self-absolved`, `removed`, `bloodlust`, `vendetta-used`, `extra-move`.
 
@@ -58,16 +58,19 @@ A `GameEvent` is one of: `roll` (cause `capture` or `witness`, with the piece, t
 
 ```
 applyMove(state, moveId, rng)
-  getLegalMoves                      layer 1 (piece movement) filtered by layer 2 (check rules),
-                                     both under REMORSE_OPTIONS
+  getLegalMoves                      layer 1 (piece movement) under REMORSE_OPTIONS; layer 2
+                                     (check rules) is off because the king is captured, not mated
   makeBoardMove                      standard chess: the pieces, castling rights, en passant, clocks
-  resolveMove (remorse.ts)           1. the capturer: vendetta spent, or reaction rolled/re-applied
+  resolveMove (remorse.ts)           0. the enemy king taken: the game is won, nothing else runs
+                                     1. the capturer: vendetta spent, or reaction rolled/re-applied
                                      2. witnesses roll (Witnesses only), in board order
                                      3. a healthy bishop that just landed absolves its neighbours
                                      4. a Sadist's first capture of the turn: extra move pending, stop
-                                     5. otherwise finishTurn: the mover's penances and countdowns
-                                        tick; the opponent's expired pieces remove themselves
-  evaluateStatus                     check, checkmate, stalemate and draws for whoever moves next
+                                     5. otherwise finishTurn: bishops standing beside the mover's
+                                        afflicted pieces absolve them; the mover's penances and
+                                        countdowns tick; the opponent's expired pieces remove themselves
+  evaluateStatus                     an attacked king (a warning only), stalemate and draws for
+                                     whoever moves next
 ```
 
 `applyMove(state, PASS_MOVE_ID)` ends a pending extra move (step 5 only). `makeMove` is the same pipeline without the log and status, for the bot's search.
@@ -79,10 +82,11 @@ The chess generator takes options, and Remorse Chess is one options object (`REM
 | Option | Layer | Remorse Chess uses it for |
 |---|---|---|
 | `canMove` | moves | devastated pieces cannot move; during an extra move only the Sadist may |
-| `canCapture` | moves | guilt-ridden pieces capture nothing (except a vendetta's target); nothing captures a king |
+| `canCapture` | moves | guilt-ridden pieces capture nothing (except a vendetta's target); kings can be captured only under `WIN_BY_KING_CAPTURE` |
 | `canCaptureFriendly` | moves | bloodlust |
 | `capturesOnly` | moves | bloodlust |
-| `canAttack` | attacks | guilt-ridden and devastated pieces give no check and do not stop castling |
+| `canAttack` | attacks | guilt-ridden and devastated pieces do not count as attacking the king (for the warning highlight) |
+| `checkRules` | legality | `false` under `WIN_BY_KING_CAPTURE`: every pseudo-legal move is legal and there is no checkmate |
 
 Legality (`isLegalMove`) only needs the bare board move: no die can make an enemy piece more dangerous to the mover's king, so whether a move is legal never depends on a roll.
 

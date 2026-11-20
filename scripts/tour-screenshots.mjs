@@ -100,12 +100,14 @@ for (const size of Object.keys(SIZES)) {
   await square(page, "d5").click();
   await shot(page, `${size}-5e-devastated`);
 
-  // A check, then scholar's mate for the game-over popup (the queen rolls a 4: unaffected)
+  // Scholar's "mate" is only an attack; the queen (rolled 4: unaffected) then takes the king
   await openLocal(page, base, { rules: "reactions", dice: [4] });
   await playLine(page, ["e2e4", "e7e5", "f1c4", "b8c6", "d1h5", "g8f6", "h5f7"]);
+  await shot(page, `${size}-6a-king-attacked`);
+  await playLine(page, ["a7a6", "f7e8"]);
   await shot(page, `${size}-6-game-over`);
   await page.getByRole("button", { name: "View board" }).click();
-  await shot(page, `${size}-6b-checkmate-board`);
+  await shot(page, `${size}-6b-king-captured-board`);
 
   // Promotion picker
   await openLocal(page, base, { rules: "reactions", dice: [4] });

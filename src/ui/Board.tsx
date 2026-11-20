@@ -124,7 +124,7 @@ export function Board({
 
 function squareAriaLabel(square: Square, piece: Piece | null, move: Move | undefined, inCheck: boolean, status: string) {
   const contents = piece ? `${playerName(piece.player)} ${pieceName(piece.kind)}${status ? ` (${status})` : ""}` : "empty";
-  const checkText = inCheck ? ", in check" : "";
+  const checkText = inCheck ? ", under attack" : "";
   const moveText = move ? (move.captures.length > 0 ? ", capture destination" : ", legal destination") : "";
   return `${squareName(square)}, ${contents}${checkText}${moveText}`;
 }

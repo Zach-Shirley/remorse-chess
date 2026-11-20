@@ -187,12 +187,10 @@ describe("guilt (video 1)", () => {
     expect(ids(state)).toContain("e8e7");
   });
 
-  it("a king may walk next to a guilt-ridden piece and castle past it", () => {
+  it("with king capture there are no check rules: a king may castle through attack or walk into it", () => {
     const fen = "r3k3/8/8/8/8/8/8/3RK3 b q - 0 1";
-    expect(ids(fromFen(fen, REACTIONS))).not.toContain("e8c8");
-    const state = setMind(fromFen(fen, REACTIONS), "d1", { affliction: "guilty" });
-    expect(ids(state)).toContain("e8c8");
-    expect(ids(state)).toContain("e8d8");
+    expect(ids(fromFen(fen, REACTIONS))).toContain("e8c8");
+    expect(ids(fromFen(fen, REACTIONS))).toContain("e8d8");
   });
 
   it("a devastated piece gives no check either", () => {
@@ -203,9 +201,26 @@ describe("guilt (video 1)", () => {
     expect(state.status).toMatchObject({ phase: "playing", check: false });
   });
 
-  it("no move ever captures a king", () => {
-    // An impossible position on purpose: White to move with Black's king already attacked.
-    expect(ids(fromFen("4k3/8/8/8/8/8/8/4RK2 w - - 0 1", REACTIONS))).not.toContain("e1e8");
+  it("capturing the king wins at once, with no roll", () => {
+    const start = fromFen("4k3/8/8/8/8/8/8/4RK2 w - - 0 1", WITNESSES);
+    expect(start.status).toMatchObject({ phase: "playing" });
+    const state = play(start, noDice(), "e1e8");
+    expect(state.status).toMatchObject({ phase: "won", winner: "white", reason: "king-captured" });
+    expect(state.moveLog[0].notation).toBe("Rxe8#");
+    expect(lastEvents(state)).toEqual([]);
+    expect(getLegalMoves(state)).toEqual([]);
+  });
+
+  it("a guilt-ridden piece cannot take the king", () => {
+    const start = setMind(fromFen("4k3/8/8/8/8/8/8/4RK2 w - - 0 1", REACTIONS), "e1", { affliction: "guilty" });
+    expect(ids(start)).not.toContain("e1e8");
+  });
+
+  it("an attacked king is a warning, not a restriction", () => {
+    const state = fromFen("4k3/8/8/8/8/8/4R3/4K3 b - - 0 1", REACTIONS);
+    expect(state.status).toMatchObject({ phase: "playing", check: true, message: "Black's king is under attack" });
+    // Black may ignore it.
+    expect(ids(state)).toContain("e8e7");
   });
 });
 
@@ -234,10 +249,44 @@ describe("absolution (video 1)", () => {
     expect(mindAt(state, "e5")).toEqual({});
   });
 
-  it("a piece that walks up to a stationary bishop is not absolved", () => {
+  it("a piece that walks up to a standing bishop is absolved at the end of the turn", () => {
     const start = setMind(fromFen("4k3/8/8/7R/8/8/8/4K1B1 w - - 0 1", CLASSIC), "h5", guilty);
     const state = play(start, noDice(), "h5h2");
-    expect(mindAt(state, "h2")).toMatchObject({ affliction: "guilty" });
+    expect(mindAt(state, "h2")).toEqual({});
+    expect(lastEvents(state)).toEqual([
+      {
+        type: "absolved",
+        by: expect.objectContaining({ kind: "bishop", square: parseSquare("g1") }),
+        pieces: [expect.objectContaining({ kind: "rook", square: parseSquare("h2") })]
+      }
+    ]);
+  });
+
+  it("witnesses beside a standing bishop are absolved at the end of their owner's next turn", () => {
+    // White pawns on d4 and e4 with a bishop behind them on e3. Black's rook takes the knight on
+    // d5, next to both pawns; both roll 1 and turn guilt-ridden.
+    const start = fromFen("4k3/3r4/8/3N4/3PP3/4B3/8/4K3 b - - 0 1", WITNESSES);
+    const witnessed = play(start, scriptedDice(4, 1, 1), "d7d5");
+    expect(mindAt(witnessed, "d4")).toMatchObject({ affliction: "guilty", temporary: true });
+    expect(mindAt(witnessed, "e4")).toMatchObject({ affliction: "guilty", temporary: true });
+    // White makes any move: the bishop that stood there all along absolves them both.
+    const state = play(witnessed, noDice(), "e1f1");
+    expect(mindAt(state, "d4")).toEqual({});
+    expect(mindAt(state, "e4")).toEqual({});
+    expect(lastEvents(state).map((event) => event.type)).toEqual(["absolved", "absolved"]);
+  });
+
+  it("a piece's own capture beside a standing bishop still costs it one turn of guilt", () => {
+    // The rook on d2 takes on d3, beside the bishop on e2, and rolls guilt.
+    const start = fromFen("4k3/8/8/8/8/3p4/3RB3/4K3 w - - 0 1", REACTIONS);
+    const captured = play(start, scriptedDice(2), "d2d3");
+    expect(mindAt(captured, "d3")).toMatchObject({ affliction: "guilty" });
+    const later = play(captured, noDice(), "e8d8");
+    expect(mindAt(later, "d3")).toMatchObject({ affliction: "guilty" });
+    // At the end of White's next turn it is absolved.
+    const state = play(later, noDice(), "e1f1");
+    expect(mindAt(state, "d3")).toMatchObject({ reaction: "guilty", captures: 1 });
+    expect(mindAt(state, "d3")?.affliction).toBeUndefined();
   });
 
   it("a guilt-ridden bishop absolves nobody", () => {
@@ -437,13 +486,14 @@ describe("the Sadist (videos 2 and 3)", () => {
     expect(twice.moveLog.map((entry) => entry.turn)).toEqual([1, 1]);
   });
 
-  it("the extra move may not leave the Sadist's own king in check", () => {
-    // The Sadist shields its king from the rook on e8, before and after taking on e5.
-    const fen = "4r1k1/8/8/4p3/8/8/4R3/4K3 w - - 0 1";
+  it("the extra move may take the king and win", () => {
+    const fen = "4k3/8/8/4p3/8/8/4R3/4K3 w - - 0 1";
     const start = setMind(fromFen(fen, REACTIONS), "e2", { reaction: "sadist", captures: 1 });
     const state = play(start, noDice(), "e2e5");
     expect(state.extraMove).not.toBeNull();
-    expect(ids(state).sort()).toEqual(["e5e2", "e5e3", "e5e4", "e5e6", "e5e7", "e5e8"]);
+    expect(ids(state)).toContain("e5e8");
+    const won = play(state, noDice(), "e5e8");
+    expect(won.status).toMatchObject({ phase: "won", winner: "white", reason: "king-captured" });
   });
 });
 
@@ -475,7 +525,10 @@ describe("bloodlust (video 2)", () => {
 
   it("a friendly capture is logged as friendly fire and is nobody's trophy", () => {
     const state = play(setMind(fromFen(fen, REACTIONS), "d2", bloodlust), noDice(), "d2e2");
-    expect(state.moveLog[0]).toMatchObject({ friendlyFire: true, captured: ["pawn"], notation: "Rxe2+" });
+    expect(state.moveLog[0]).toMatchObject({ friendlyFire: true, captured: ["pawn"], notation: "Rxe2" });
+    // The bloodlust extra move can take the king that is now on its file.
+    expect(state.extraMove).not.toBeNull();
+    expect(ids(state)).toContain("e2e8");
     expect(getMaterial(state).captured).toEqual({ white: [], black: [] });
     expect(mindAt(state, "e2")).toMatchObject({ captures: 4 });
   });
@@ -578,12 +631,17 @@ describe("witnesses (videos 4 and 5)", () => {
     expect(mindAt(state, "b3")).toEqual({ affliction: "guilty", captures: 1 });
   });
 
-  it("a guilt-ridden piece with a vendetta gives no check", () => {
-    const start = setMind(fromFen("4k3/8/8/8/8/8/4r3/4K3 w - - 0 1", WITNESSES), "e2", {
+  it("a guilt-ridden piece with a vendetta against the king threatens it and may take it", () => {
+    const start = setMind(fromFen("4k3/8/8/8/8/8/4r3/K7 b - - 0 1", WITNESSES), "e2", {
       affliction: "guilty",
       vendetta: "king"
     });
-    expect(start.status).toMatchObject({ phase: "playing", check: false });
+    expect(ids(start)).toContain("e2e1");
+    const onFile = setMind(fromFen("4k3/8/8/8/8/8/4r3/4K3 w - - 0 1", WITNESSES), "e2", {
+      affliction: "guilty",
+      vendetta: "king"
+    });
+    expect(onFile.status).toMatchObject({ phase: "playing", check: true });
   });
 
   it("a healthy piece with a vendetta rolls as usual for other targets and keeps the vendetta", () => {
@@ -606,40 +664,38 @@ describe("witnesses (videos 4 and 5)", () => {
   });
 });
 
-describe("checkmate, stalemate and repetition under these rules", () => {
-  it("checkmate still wins", () => {
-    const state = play(fromFen("6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1", REACTIONS), noDice(), "a1a8");
-    expect(state.status).toMatchObject({ phase: "won", winner: "white", reason: "checkmate" });
-    expect(state.moveLog[0].notation).toBe("Ra8#");
+describe("king capture, stalemate and repetition under these rules", () => {
+  it("there is no checkmate: the king must actually be taken", () => {
+    const mated = play(fromFen("6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1", REACTIONS), noDice(), "a1a8");
+    expect(mated.status).toMatchObject({ phase: "playing", check: true });
+    expect(mated.moveLog[0].notation).toBe("Ra8+");
+    const state = play(mated, noDice(), "h7h6", "a8g8");
+    expect(state.status).toMatchObject({ phase: "won", winner: "white", reason: "king-captured" });
+    expect(state.moveLog[2].notation).toBe("Rxg8#");
   });
 
-  it("a guilt-ridden piece cannot deliver it", () => {
+  it("a guilt-ridden piece gives no check and cannot take the king", () => {
     const start = setMind(fromFen("6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1", REACTIONS), "a1", { affliction: "guilty" });
     const state = play(start, noDice(), "a1a8");
     expect(state.status).toMatchObject({ phase: "playing", check: false });
     expect(state.moveLog[0].notation).toBe("Ra8");
+    expect(ids(play(state, noDice(), "h7h6"))).not.toContain("a8g8");
   });
 
-  it("it is mate when the only defender is too guilt-ridden to capture", () => {
-    // Only the bishop on h1 can answer Ra8+, by taking the rook.
+  it("a guilt-ridden defender cannot take the attacker", () => {
     const fen = "6k1/5ppp/8/8/8/8/8/R3K2b w - - 0 1";
     const healthy = play(fromFen(fen, REACTIONS), noDice(), "a1a8");
-    expect(healthy.status).toMatchObject({ phase: "playing", check: true });
+    expect(ids(healthy)).toContain("h1a8");
     const guilty = play(setMind(fromFen(fen, REACTIONS), "h1", { affliction: "guilty" }), noDice(), "a1a8");
-    expect(guilty.status).toMatchObject({ phase: "won", winner: "white", reason: "checkmate" });
+    expect(ids(guilty)).not.toContain("h1a8");
   });
 
-  it("stalemate is still a draw", () => {
-    expect(fromFen("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1", REACTIONS).status).toMatchObject({
-      phase: "draw",
-      reason: "stalemate"
-    });
-  });
-
-  it("a side whose only other piece is immobilised is stalemated", () => {
-    const fen = "7k/5Q2/6K1/8/8/8/8/r7 b - - 0 1";
+  it("a side with no move at all is stalemated, even with its king attacked", () => {
+    // Black's king is boxed in by its own rooks; all three are devastated and cannot move.
+    const fen = "6rk/6rr/8/8/8/8/8/K7 b - - 0 1";
     expect(fromFen(fen, REACTIONS).status.phase).toBe("playing");
-    const state = setMind(fromFen(fen, REACTIONS), "a1", { affliction: "devastated", turnsLeft: 3 });
+    let state = fromFen(fen, REACTIONS);
+    for (const square of ["g8", "g7", "h7"]) state = setMind(state, square, { affliction: "devastated", turnsLeft: 3 });
     expect(state.status).toMatchObject({ phase: "draw", reason: "stalemate" });
   });
 

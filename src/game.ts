@@ -105,7 +105,8 @@ export type GameStatus =
       phase: "won";
       winner: Player;
       // "despair": the loser's devastated king removed itself.
-      reason: "checkmate" | "resignation" | "despair";
+      // "king-captured": the winner took the king (the rule in Remorse Chess, see interpretation.ts).
+      reason: "checkmate" | "resignation" | "despair" | "king-captured";
       message: string;
     }
   | {
@@ -755,8 +756,9 @@ export function applyMove(state: GameState, moveId: string, rng: Rng = MODEL_DIC
   const next: GameState = { ...moved, positionCounts, lastEvents: events, actionCount: state.actionCount + 1 };
   const status = moved.status.phase === "won" ? moved.status : evaluateStatus(next);
   const turnPassed = next.currentPlayer !== move.player;
-  const check = turnPassed && (status.phase === "playing" ? status.check : status.phase === "won" && status.reason === "checkmate");
-  const suffix = status.phase === "won" && status.reason === "checkmate" ? "#" : check ? "+" : "";
+  const decisive = status.phase === "won" && (status.reason === "checkmate" || status.reason === "king-captured");
+  const check = turnPassed && (status.phase === "playing" ? status.check : decisive);
+  const suffix = decisive ? "#" : check ? "+" : "";
 
   const entry: MoveLogEntry = {
     turn: state.fullmoveNumber,
@@ -803,7 +805,10 @@ export function isGameOver(state: GameState): boolean {
 export function evaluateStatus(state: GameState): GameStatus {
   const player = state.currentPlayer;
   const options = variantOptions(state);
-  const check = options.checkRules === false ? false : isInCheck(state, player, options.attacks ?? {});
+  // With check rules off (the king is captured, not mated) "check" still reports that the king is
+  // attacked, as a warning, but it never restricts moves and never means checkmate.
+  const checkRules = options.checkRules !== false;
+  const check = isInCheck(state, player, options.attacks ?? {});
   const hasMove = generateLegalMoves(state, player).length > 0;
 
   // A Sadist's extra move is pending: the turn is not over, so nothing else is judged yet.
@@ -811,7 +816,7 @@ export function evaluateStatus(state: GameState): GameStatus {
     return { phase: "playing", check, message: `${playerName(player)}'s Sadist may move again` };
   }
 
-  if (!hasMove && check) {
+  if (!hasMove && check && checkRules) {
     const winner = opponentOf(player);
     return { phase: "won", winner, reason: "checkmate", message: `Checkmate. ${playerName(winner)} wins` };
   }
@@ -830,7 +835,11 @@ export function evaluateStatus(state: GameState): GameStatus {
   return {
     phase: "playing",
     check,
-    message: check ? `${playerName(player)} is in check` : `${playerName(player)} to move`
+    message: check
+      ? checkRules
+        ? `${playerName(player)} is in check`
+        : `${playerName(player)}'s king is under attack`
+      : `${playerName(player)} to move`
   };
 }
 

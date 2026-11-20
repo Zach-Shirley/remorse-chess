@@ -53,6 +53,14 @@ export const BISHOP_SELF_ABSOLVE_TURNS = 1;
 // A devastated bishop does not heal itself: it needs another bishop.
 export const DEVASTATED_BISHOP_SELF_ABSOLVES = false;
 
+// A bishop that is already standing next to an afflicted friendly piece absolves it too: at the
+// end of the owner's turn, every afflicted piece with a healthy friendly bishop beside it is
+// absolved. A piece that became afflicted during that same turn (its own capture) waits until
+// the end of the owner's next turn, which is the creator's "this process takes one turn".
+// False: only a bishop that moves next to the piece absolves it (so a bishop already beside a
+// piece that turns guilt-ridden must step away and back). Changed at Zach's request, 2026-11-20.
+export const STANDING_BISHOP_ABSOLVES = true;
+
 // --- Reactions ---------------------------------------------------------------------------------
 
 // A reaction is a permanent disposition: a piece that rolled "guilt-ridden" becomes guilt-ridden
@@ -63,15 +71,23 @@ export const REACTION_RECURS = true;
 // Kings roll like any other piece (and can witness). False: kings never react.
 export const KINGS_ROLL = true;
 
+// --- Winning -----------------------------------------------------------------------------------
+
+// ZACH'S CHANGE (2026-11-20), not the creator's rule: you win by capturing the enemy king, not by
+// checkmate. There are no check rules: a king may be left attacked or walk into danger, and a
+// Sadist's extra move or a vendetta can take the king. The creator's video 1 says checkmate;
+// set this to false to play it his way.
+export const WIN_BY_KING_CAPTURE = true;
+
 // --- Check -------------------------------------------------------------------------------------
 
 // Guilt-ridden and devastated pieces refuse to capture, so they give no check and control no
 // squares: a king may stand next to them and castle past them.
 export const AFFLICTED_PIECES_GIVE_CHECK = false;
 
-// No move may ever capture a king. So a vendetta whose target type is the king (a king made the
-// capture) can never be collected, and it gives no check either.
-export const VENDETTA_AGAINST_KING_GIVES_CHECK = false;
+// Under checkmate rules no move may capture a king, so a vendetta sworn against the king (a king
+// made the capture) can never be collected and gives no check. Under king capture it can be used.
+export const VENDETTA_AGAINST_KING_GIVES_CHECK = WIN_BY_KING_CAPTURE;
 
 // --- Devastation -------------------------------------------------------------------------------
 
@@ -125,7 +141,7 @@ export function vendettaTarget(capturerKindBeforeMove: PieceKind): PieceKind {
 
 // --- Standard chess that stays standard --------------------------------------------------------
 // En passant is a capture by the pawn (it rolls, and the witnesses are the neighbours of the
-// captured pawn's square). Castling, promotion and the draws follow standard chess. Every roll
-// and the Sadist's extra move happen before check, checkmate and stalemate are evaluated for the
-// next player. A side that has only immobilised or pacifist pieces and no legal move is
-// stalemated: a draw.
+// captured pawn's square). Castling, promotion and the draws follow standard chess (with king
+// capture, castling only needs the king and rook unmoved and the squares between them empty).
+// Every roll and the Sadist's extra move happen before the next player's position is judged.
+// A side that has only immobilised or pacifist pieces and no legal move is stalemated: a draw.

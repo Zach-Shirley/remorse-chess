@@ -180,7 +180,7 @@ export function EventFeed({ state }: { state: GameState }) {
 }
 
 const LEGEND: { token: TokenKind | "vendetta"; glyph: ReactNode; text: string }[] = [
-  { token: "guilty", glyph: <Droplet aria-hidden="true" />, text: "Refuses to capture and gives no check until a friendly bishop lands next to it." },
+  { token: "guilty", glyph: <Droplet aria-hidden="true" />, text: "Refuses to capture until a friendly bishop is next to it." },
   { token: "devastated", glyph: 3, text: "Cannot move. The number is the turns its owner has left to bring a bishop." },
   { token: "unaffected", glyph: <Minus aria-hidden="true" />, text: "Has rolled, and captures never trouble it." },
   { token: "sadist", glyph: <Zap aria-hidden="true" />, text: "May move again after it captures." },

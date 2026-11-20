@@ -33,7 +33,7 @@ export const RULES_BY_SET: Record<RuleSetName, { heading: string; intro: string;
     heading: "Classic",
     intro: "The first video. No dice.",
     rules: [
-      { text: "It is chess, and you win by checkmate.", videos: [1] },
+      { text: "It is chess (the creator's version is won by checkmate; this app uses king capture, see the house rule).", videos: [1] },
       { text: "A piece that captures becomes guilt-ridden: a token goes under it.", videos: [1] },
       { text: "A guilt-ridden piece is a pacifist. It moves as usual but refuses to capture.", videos: [1] },
       { text: "Move a bishop to a square next to a guilt-ridden piece to absolve it. It can capture again.", videos: [1] },
@@ -67,21 +67,26 @@ export const RULES_BY_SET: Record<RuleSetName, { heading: string; intro: string;
   }
 };
 
+// Deliberate changes from the creator's rules (each matches a constant in interpretation.ts).
+export const HOUSE_RULES: string[] = [
+  "You win by capturing the enemy king, not by checkmate. There are no check rules: a king may be left under attack or walk into it, and a Sadist's extra move or a vendetta can take the king. The creator says checkmate; with Sadists moving twice, a king can be taken outside a normal turn, so capture plays better here."
+];
+
 // What the videos do not settle, and what this app does about it. Each line matches a constant
 // or function in src/variant/interpretation.ts.
 export const INTERPRETATIONS: string[] = [
   "\"Adjacent\" means all eight neighbouring squares, diagonals included, for absolution and for witnesses.",
-  "Only a friendly bishop that is itself healthy absolves. It happens the moment its move lands, and it clears every afflicted friendly piece next to the landing square: guilt-ridden or devastated, temporary or not. A piece that walks up to a bishop is not absolved.",
+  "Only a friendly bishop that is itself healthy absolves. It happens the moment its move lands, and it clears every afflicted friendly piece next to the landing square: guilt-ridden or devastated, temporary or not. A bishop that is already standing next to an afflicted piece also absolves it, at the end of its owner's turn. A piece's own capture still costs it one full turn of guilt first.",
   "A pawn that promotes to a bishop absolves the pieces next to its promotion square.",
   "A guilt-ridden bishop absolves itself when its owner has finished their next turn. A devastated bishop needs another bishop.",
   "A reaction is permanent: a piece that rolled guilt-ridden is guilt-ridden again after every capture, and a piece that rolled devastated is devastated again. An unaffected piece never suffers from its own captures.",
-  "Guilt-ridden and devastated pieces give no check and control no squares, so a king may stand next to them and castle past them.",
+  "Guilt-ridden and devastated pieces refuse to capture, so they never threaten a king.",
   "The three turns of devastation are the owner's own turns. If the piece is still devastated when the owner's fourth turn would start, it is removed before they move.",
   "Kings roll like any other piece. A devastated king that is not absolved in time removes itself, and its side loses.",
   "The Sadist's extra move is optional (End turn), must be made with the Sadist itself, and may be any legal move for it. The capture that rolls the 6 already earns one.",
-  "No move may ever capture a king. A piece with bloodlust may take any friendly piece except its own king, and friendly captures count toward its three.",
-  "A vendetta capture can be made even while guilt-ridden; it rolls no reaction and causes no guilt, and it is used up. The victim's neighbours still roll as witnesses. A vendetta against the king (when a king made the capture) can never be collected.",
+  "Taking the enemy king ends the game at once, with no roll. A piece with bloodlust may take any friendly piece except its own king, and friendly captures count toward its three.",
+  "A vendetta capture can be made even while guilt-ridden; it rolls no reaction and causes no guilt, and it is used up. The victim's neighbours still roll as witnesses. A vendetta against the king (when a king made the capture) lets even a guilt-ridden piece take the king.",
   "Witnesses roll in board order (a8 to h1) after the capturing piece's own roll. A witness that is already devastated still rolls, and a new vendetta replaces an old one.",
   "En passant is a capture by the pawn, and its witnesses are the neighbours of the captured pawn. Castling, promotion and the draws are standard chess.",
-  "Every roll and the Sadist's extra move happen before check, checkmate and stalemate are judged for the next player. A side with no legal move and no check on its king is stalemated, even if that is because its pieces are immobilised or refuse to capture."
+  "Every roll and the Sadist's extra move happen before the next player's position is judged. A side with no legal move is stalemated, even if that is because its pieces are immobilised or refuse to capture."
 ];

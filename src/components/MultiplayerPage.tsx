@@ -1092,10 +1092,10 @@ function getOnlineStatusMessage(state: GameState, player: Player, connected: boo
   if (state.status.phase !== "playing") return state.status.message;
   if (state.currentPlayer !== player) {
     if (state.extraMove) return "Your opponent's Sadist may move again.";
-    return state.status.check ? "Check! Waiting for your opponent." : "Waiting for your opponent.";
+    return state.status.check ? "Their king is under attack. Waiting for your opponent." : "Waiting for your opponent.";
   }
   if (state.extraMove) return "Your Sadist may move again, or end the turn.";
-  if (state.status.check) return "You are in check. Get your king to safety.";
+  if (state.status.check) return "Your king is under attack. Save it or it will be captured.";
   return "Select a piece to make a move.";
 }
 

@@ -3,13 +3,13 @@
 import { ExternalLink } from "lucide-react";
 import type { PieceKind } from "../game";
 import { RULE_SETS, type RuleSet } from "../variant/remorse";
-import { CREATOR, INTERPRETATIONS, RULES_BY_SET, VIDEOS, type RuleSetName } from "../variant/rulesText";
+import { CREATOR, HOUSE_RULES, INTERPRETATIONS, RULES_BY_SET, VIDEOS, type RuleSetName } from "../variant/rulesText";
 import { TokenLegend } from "./Conscience";
 import { Modal } from "./Modal";
 import { pieceSprite } from "./PieceToken";
 
 const PIECE_RULES: { kind: PieceKind; title: string; text: string }[] = [
-  { kind: "king", title: "King", text: "One square in any direction. It may never move into check." },
+  { kind: "king", title: "King", text: "One square in any direction. Lose it and you lose the game." },
   { kind: "queen", title: "Queen", text: "Any distance in a straight line: along ranks, files or diagonals." },
   { kind: "rook", title: "Rook", text: "Any distance along ranks and files." },
   { kind: "bishop", title: "Bishop", text: "Any distance along diagonals. Here it is also the confessor." },
@@ -19,12 +19,12 @@ const PIECE_RULES: { kind: PieceKind; title: string; text: string }[] = [
 
 const CHESS_NOTES: { title: string; text: string }[] = [
   {
-    title: "Check and checkmate",
-    text: "A king under attack is in check and must escape at once. If it cannot, that is checkmate and the game is over."
+    title: "No check, no checkmate",
+    text: "Here you win by capturing the enemy king. A king under attack is only a warning: nothing forces you to deal with it, and a king may even step into danger."
   },
   {
     title: "Castling",
-    text: "Once per game the king moves two squares toward a rook and the rook jumps over it. Neither may have moved, the squares between must be empty, and the king may not castle out of, through or into check."
+    text: "Once per game the king moves two squares toward a rook and the rook jumps over it. Neither may have moved and the squares between must be empty. With no check rules, attacked squares do not matter."
   },
   {
     title: "En passant",
@@ -36,7 +36,7 @@ const CHESS_NOTES: { title: string; text: string }[] = [
   },
   {
     title: "Draws",
-    text: "Stalemate (no legal move while not in check), the same position three times, fifty moves by each side with no capture or pawn move, or too little material left to checkmate."
+    text: "Stalemate (no legal move at all), the same position three times, fifty moves by each side with no capture or pawn move, or bare kings."
   }
 ];
 
@@ -63,7 +63,7 @@ export function RulesDialog({ onClose, ruleSet }: { onClose: () => void; ruleSet
   return (
     <Modal
       title="How to play"
-      description="Chess, except the pieces have a conscience. Checkmate still wins."
+      description="Chess, except the pieces have a conscience. Capture the king to win."
       onClose={onClose}
       wide
     >
@@ -95,6 +95,20 @@ export function RulesDialog({ onClose, ruleSet }: { onClose: () => void; ruleSet
             <h3>Tokens on the board</h3>
           </header>
           <TokenLegend />
+        </section>
+
+        <section className="rules-section" data-rules="house">
+          <header>
+            <h3>House rule</h3>
+          </header>
+          <p className="rules-intro">A change from the creator's rules, made for this app.</p>
+          <ul className="rule-lines interpretation">
+            {HOUSE_RULES.map((text) => (
+              <li key={text}>
+                <span>{text}</span>
+              </li>
+            ))}
+          </ul>
         </section>
 
         <section className="rules-section" data-rules="interpretation">

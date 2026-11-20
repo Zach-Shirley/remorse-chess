@@ -324,7 +324,9 @@ function getStateMessage(state: GameState, humanPlayer: Player | null) {
   if (status.phase !== "playing") return status.message;
   if (state.extraMove) return "The Sadist may move again, or end the turn.";
   if (status.check) {
-    return humanPlayer ? "You are in check. Get your king to safety." : `${playerName(state.currentPlayer)} is in check.`;
+    return humanPlayer
+      ? "Your king is under attack. Save it or it will be captured."
+      : `${playerName(state.currentPlayer)}'s king is under attack.`;
   }
   return "Select a piece to make a move.";
 }

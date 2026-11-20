@@ -57,7 +57,7 @@ function checkInvariants(state: GameState) {
     expect(getLegalMoves(state).length).toBeGreaterThan(0);
     if (state.extraMove.pieceId) expect(findPiece(state, state.extraMove.pieceId)).not.toBeNull();
   }
-  const lostToDespair = state.status.phase === "won" && state.status.reason === "despair";
+  const lostToDespair = state.status.phase === "won" && (state.status.reason === "despair" || state.status.reason === "king-captured");
   if (!lostToDespair) {
     expect(findKing(state, "white")).not.toBeNull();
     expect(findKing(state, "black")).not.toBeNull();

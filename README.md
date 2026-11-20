@@ -20,7 +20,7 @@ The screenshots are made by `node scripts/tour-screenshots.mjs http://localhost:
 
 ## The rules
 
-It is standard chess, and you still win by checkmate. What changes is what a capture does to the piece that makes it.
+It is standard chess, except that you win by capturing the enemy king (a house rule, see below). What changes is what a capture does to the piece that makes it.
 
 The game offers three rule sets, each adding one layer of the creator's videos. Every rule below is labelled **creator's video** (he says it, and the video is linked) or **this app's interpretation** (he does not say, and this app had to decide).
 
@@ -41,7 +41,7 @@ Sources, all by the creator:
 | Moving a bishop to a square adjacent to a guilt-ridden piece absolves it, and it can capture again. | creator's video 1 |
 | A bishop that captures is guilt-ridden too, takes one turn to clean its own conscience, then absolves itself. | creator's video 1 |
 | With no bishops left, a side cannot absolve until a pawn promotes to a bishop. | creator's video 1 |
-| You win by checkmate. | creator's video 1 |
+| You win by checkmate. | creator's video 1 (**changed in this app**: see the house rule) |
 
 ### Reactions (videos 1 to 3, the default)
 
@@ -76,17 +76,20 @@ The videos leave these questions open. The answers are this app's, not the creat
 | Does promoting to a bishop absolve? | Yes: the new bishop absolves the pieces next to its promotion square. | this app's interpretation |
 | How does a bishop's "one turn" work? | A guilt-ridden bishop absolves itself when its owner has finished their next turn. A devastated bishop needs another bishop. | this app's interpretation |
 | Is a reaction a one-off or a disposition? | A disposition: a piece that rolled guilt-ridden is guilt-ridden again after every capture, a piece that rolled devastated is devastated again, and an unaffected piece never suffers from its own captures. | this app's interpretation |
-| Do afflicted pieces give check? | No. Guilt-ridden and devastated pieces give no check and control no squares, so a king may stand next to them and castle past them. | this app's interpretation |
+| Do afflicted pieces threaten the king? | No. Guilt-ridden and devastated pieces refuse to capture, so they never threaten a king. | this app's interpretation |
 | Whose turns are the "three turns"? | The owner's. If the piece is still devastated when the owner's fourth turn would start, it is removed before they move. | this app's interpretation |
 | Do kings roll? | Yes, like any piece. A devastated king that is not absolved in time removes itself and its side loses. | this app's interpretation |
 | The Sadist's extra move | Optional (there is an End turn button), made with the Sadist itself, any legal move for it. The capture that rolls the 6 already earns one. | this app's interpretation |
-| Can a king be captured? | Never, by any move. A piece with bloodlust may take any friendly piece except its own king; friendly captures count toward its three. | this app's interpretation |
-| Vendetta details | It can be used while guilt-ridden, rolls no reaction, causes no guilt and is used up. The victim's neighbours still roll. A new vendetta replaces an old one. A vendetta against the king (when a king made the capture) can never be collected. | this app's interpretation |
+| Can a king be captured? | Yes: that is how the game is won (house rule). Taking it ends the game at once, with no roll. A piece with bloodlust may take any friendly piece except its own king; friendly captures count toward its three. | this app's interpretation |
+| Vendetta details | It can be used while guilt-ridden, rolls no reaction, causes no guilt and is used up. The victim's neighbours still roll. A new vendetta replaces an old one. A vendetta against the king (when a king made the capture) lets even a guilt-ridden piece take the king. | this app's interpretation |
 | Order of rolls | The capturer first, then witnesses in board order (a8 to h1). A witness that is already devastated still rolls. | this app's interpretation |
 | Standard chess | En passant is a capture by the pawn; its witnesses are the neighbours of the captured pawn. Castling, promotion and the draws are standard. | this app's interpretation |
-| When is the position judged? | Every roll and the Sadist's extra move happen before check, checkmate and stalemate are judged for the next player. A side with no legal move and no check is stalemated, even when that is because its pieces are immobilised or refuse to capture. | this app's interpretation |
+| When is the position judged? | Every roll and the Sadist's extra move happen before the next player's position is judged. A side with no legal move at all is stalemated, even when that is because its pieces are immobilised or refuse to capture. | this app's interpretation |
+| Does a bishop that is already standing there absolve? | Yes. At the end of its owner's turn, every afflicted piece with a healthy friendly bishop next to it is absolved, so a bishop does not have to step away and back. A piece's own capture still costs it one full turn of guilt first. (Changed on 2026-11-20 at Zach's request; before, only an arriving bishop absolved.) | this app's interpretation |
 
-One consequence worth knowing: because a guilt-ridden piece gives no check, a capture that would be checkmate in chess often is not. In Classic it never is.
+### House rule: capture the king
+
+The creator's game is won by checkmate. This app is won by **capturing the enemy king**, a change Zach made on 2026-11-20 after playtesting: a Sadist moves twice and pieces drop in and out of guilt, so a king can be exposed in ways a single turn of check cannot answer. There are no check rules at all. A king may be left under attack or walk into it; the board still highlights an attacked king and the status line warns you. Castling only needs the king and rook unmoved and the squares between them empty. A Sadist's extra move, a bloodlust capture or a vendetta against the king can all take it. Stalemate (no legal move at all) is still a draw. The rule is one constant, `WIN_BY_KING_CAPTURE` in [`src/variant/interpretation.ts`](src/variant/interpretation.ts); setting it to `false` restores checkmate.
 
 ### On the board
 
@@ -102,7 +105,7 @@ Every mode offers the three rule sets. The choice is remembered on the device, a
 
 ## How it works
 
-- **Rules engine** ([`src/game.ts`](src/game.ts)): a complete standard-chess move generator in two layers (piece movement, then the check rules), with no chess library. Remorse Chess plugs into it in two places: one options object says who may move, capture and give check, and [`src/variant/remorse.ts`](src/variant/remorse.ts) resolves what a move does to the pieces' consciences. The same code runs in the browser, the bot and the server.
+- **Rules engine** ([`src/game.ts`](src/game.ts)): a complete standard-chess move generator in two layers (piece movement, then the check rules), with no chess library. Remorse Chess plugs into it in two places: one options object says who may move and capture (and switches the check rules off, since the king is captured), and [`src/variant/remorse.ts`](src/variant/remorse.ts) resolves what a move does to the pieces' consciences. The same code runs in the browser, the bot and the server.
 - **Dice:** the engine never makes its own randomness. `applyMove(state, moveId, rng)` takes the dice as an argument and records every roll in the move log. Online, only the server rolls (from the operating system's secure generator) and both players receive the result; a client sends a move and nothing else.
 - **Bot** ([`src/bot.ts`](src/bot.ts)): alpha-beta search with iterative deepening and quiescence, in a web worker. It does not branch on dice. Inside the search every die shows 3, so an untested piece is assumed to come out guilt-ridden and witnesses are assumed not to react, while pieces whose reaction is already known behave exactly (a Sadist gets its extra move, a devastated piece counts down). The real dice are rolled when the move is played.
 - **Online play** ([`server/game-server.ts`](server/game-server.ts)): an authoritative Node and Socket.IO server. Players get generated names; nobody can type text another player sees.
@@ -126,16 +129,16 @@ For repeatable checks, a pass-and-play game can be opened directly with a rule s
 
 ## Verification
 
-**Automated (`npm test`, 201 tests, all passing):**
+**Automated (`npm test`, 204 tests, all passing):**
 
-- `tests/remorse.test.ts`, with scripted dice: each face of the capture die; that a reaction is rolled once and returns after later captures; that guilt-ridden and devastated pieces cannot capture and give no check (including castling past one); absolution by an arriving bishop, by a promotion to bishop, and not by a stationary bishop, a guilt-ridden bishop or an enemy bishop; the bishop's own one-turn penance; the no-bishop lockout; the devastation countdown and self-removal, including a king (which loses the game); the Sadist's extra move (optional, same piece, no stacking, move numbering); bloodlust (capture-only, friendly captures, never a king); every face of the witness die, doubling to devastated, vendetta typing, Sadist immunity, en passant witnesses; how Classic, Reactions and Witnesses differ; checkmate and stalemate under these rules.
+- `tests/remorse.test.ts`, with scripted dice: each face of the capture die; that a reaction is rolled once and returns after later captures; that guilt-ridden and devastated pieces cannot capture and never threaten a king; absolution by an arriving bishop, by a bishop already standing beside the piece (witnesses absolved at the end of their owner's next turn, a piece's own capture still costing one turn), by a promotion to bishop, and not by a guilt-ridden bishop or an enemy bishop; the bishop's own one-turn penance; the no-bishop lockout; the devastation countdown and self-removal, including a king (which loses the game); the Sadist's extra move (optional, same piece, no stacking, move numbering, and able to take the king); bloodlust (capture-only, friendly captures, never its own king); every face of the witness die, doubling to devastated, vendetta typing, Sadist immunity, en passant witnesses; how Classic, Reactions and Witnesses differ; king capture (wins at once with no roll, no checkmate, an attacked king is only a warning, castling through attack) and stalemate under these rules.
 - `tests/remorse-bot.test.ts`: 36 random games across the three rule sets checked for consistency after every move; the bot returns legal actions (including ending a turn), takes material with an extra move, saves a devastated king, beats a weaker level with real dice, and answers within 1.5 seconds.
 - `tests/multiplayer.test.ts`, a real Socket.IO server with real clients: the server rolls the dice and both players receive identical rolls; a pending extra move keeps the turn and can be passed only by its owner; quick match only pairs equal rule sets; plus rooms, reconnects, resignation, rematch, draws and chat rules.
 - `tests/perft.test.ts`, `tests/game.test.ts`, `tests/bot.test.ts`: the standard-chess tests of the base (move-generator node counts against published values, castling, en passant, promotion, draws, notation, bot tactics), run with the rule set switched off, so the underlying chess is still verified.
 
 **Scripted browser checks (Playwright, at 1440x900 and 402x874, run against the local dev servers on 2026-11-19):**
 
-- `node scripts/e2e-bots.mjs`: a whole game against the hard bot; the rule-set pickers; castling, check, mate, a draw and a promotion; and, with scripted dice, a roll shown and logged, guilt, absolution, relapse, a Sadist's extra move taken and declined, a witness's vendetta collected, a devastated pawn counting down 3-2-1 and removing itself; the rules dialog's sources, interpretation list and credit; a two-browser online game in which both players see the same server-rolled dice; quick match not pairing different rule sets. No console errors.
+- `node scripts/e2e-bots.mjs`: a whole game against the hard bot; the rule-set pickers; castling, an attacked king, a king capture, a draw and a promotion; and, with scripted dice, a roll shown and logged, guilt, absolution, relapse, a Sadist's extra move taken and declined, a witness's vendetta collected, a devastated pawn counting down 3-2-1 and removing itself; the rules dialog's sources, interpretation list and credit; a two-browser online game in which both players see the same server-rolled dice; quick match not pairing different rule sets. No console errors.
 - `node scripts/tour-screenshots.mjs`: every screen at both sizes, with no console errors. The screenshots were looked at and the layout problems found were fixed.
 
 **Never tested:** real phones or tablets; compiled iOS or Android builds; the sound effects by ear (they are synthesized in code and were never listened to); game balance and whether any rule set is fun over a full game with real players; bot strength against people; the deployed site and server (nothing is deployed yet).

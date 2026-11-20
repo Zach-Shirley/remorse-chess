@@ -188,20 +188,20 @@ describe("multiplayer game server", () => {
     expect(restarted.game.currentPlayer).toBe("white");
   });
 
-  it("plays a game to checkmate and rejects moves afterwards", async () => {
+  it("plays a game to a king capture and rejects moves afterwards", async () => {
     const whiteClient = await newClient();
     const blackClient = await newClient();
     const room = await createRoom(whiteClient, { name: "White", rules: { ruleSet: "reactions" } });
     await joinRoom(blackClient, { name: "Black", code: room.snapshot.code });
 
-    // Fool's mate.
+    // Fool's mate, then the queen takes the king (Remorse Chess wins by king capture).
     const finishedState = waitForState(whiteClient, (state) => state.stage === "finished");
-    for (const [client, moveId] of [[whiteClient, "f2f3"], [blackClient, "e7e5"], [whiteClient, "g2g4"], [blackClient, "d8h4"]] as const) {
+    for (const [client, moveId] of [[whiteClient, "f2f3"], [blackClient, "e7e5"], [whiteClient, "g2g4"], [blackClient, "d8h4"], [whiteClient, "a2a3"], [blackClient, "h4e1"]] as const) {
       expect(await move(client, moveId)).toEqual({ ok: true, data: null });
     }
     const finished = await finishedState;
-    expect(finished.game.status).toMatchObject({ phase: "won", winner: "black", reason: "checkmate" });
-    expect(finished.game.moveLog.map((entry) => entry.notation)).toEqual(["f3", "e5", "g4", "Qh4#"]);
+    expect(finished.game.status).toMatchObject({ phase: "won", winner: "black", reason: "king-captured" });
+    expect(finished.game.moveLog.map((entry) => entry.notation)).toEqual(["f3", "e5", "g4", "Qh4+", "a3", "Qxe1#"]);
     expect(await move(whiteClient, "e2e4")).toEqual({ ok: false, message: "That game is already over." });
     expect(await resign(whiteClient)).toEqual({ ok: false, message: "That game is already over." });
   });

@@ -132,13 +132,14 @@ for (const size of Object.keys(SIZES)) {
   await playLine(local, ["a7a6"]);
   check((await sanList(local)).at(-1) === "a6", `${tag} Black, not in check, is free to play elsewhere`);
 
-  // A check that is not mate: the highlight shows and the status says so.
+  // An attacked king: the highlight shows, but with king capture nothing forces Black to answer.
   await local.getByRole("button", { name: "New game" }).click();
   await local.getByRole("button", { name: "Start new game" }).click();
   await playLine(local, ["e2e4", "f7f6", "d1h5"]);
-  check((await local.locator('.board .check-square[data-square="e8"]').count()) === 1, `${tag} a king in check is highlighted`);
-  check((await sanList(local)).at(-1) === "Qh5+", `${tag} check is written with +`);
-  check((await local.locator(".board .movable-square").count()) === 1, `${tag} only the piece that can answer the check is movable`);
+  check((await local.locator('.board .check-square[data-square="e8"]').count()) === 1, `${tag} an attacked king is highlighted`);
+  check((await sanList(local)).at(-1) === "Qh5+", `${tag} an attack on the king is written with +`);
+  check((await local.locator(".turn-status").innerText()).includes("under attack"), `${tag} the status warns that the king is under attack`);
+  check((await local.locator(".board .movable-square").count()) > 1, `${tag} there are no check rules: other pieces may move`);
   // A draw: both sides shuffle their knights until the position has occurred three times.
   await local.getByRole("button", { name: "New game" }).click();
   await local.getByRole("button", { name: "Start new game" }).click();
@@ -171,16 +172,18 @@ for (const size of Object.keys(SIZES)) {
   check((await statusOf(local, "c6")) === "guilt-ridden", `${tag} the reaction is permanent: guilt returns after the next capture`);
   check((await local.locator(".roll-card .die").count()) === 0, `${tag} and it returns without a second roll`);
 
-  // ---- 2c. Reactions: mate with an unaffected queen, and a promotion ----
+  // ---- 2c. Reactions: an unaffected queen takes the king, and a promotion ----
   await openLocal(local, APP, { rules: "reactions", dice: [4] });
   await playLine(local, ["e2e4", "e7e5", "f1c4", "b8c6", "d1h5", "g8f6", "h5f7"]);
-  check((await sanList(local)).at(-1) === "Qxf7#", `${tag} an unaffected queen (rolled 4) mates: Qxf7#`);
-  check((await local.locator(".modal-dialog h2").innerText()) === "White wins!", `${tag} checkmate ends the game for White`);
-  check((await local.locator(".modal-dialog .modal-copy p").innerText()).startsWith("Checkmate"), `${tag} the dialog says checkmate`);
-  await local.getByRole("button", { name: "View board" }).click();
-  check((await local.locator('.board .check-square[data-square="e8"]').count()) === 1, `${tag} the mated king's square is highlighted`);
+  check((await sanList(local)).at(-1) === "Qxf7+", `${tag} an unaffected queen (rolled 4) attacks the king: Qxf7+`);
+  check(!(await isGameOver(local)), `${tag} there is no checkmate: the game goes on`);
   check((await local.locator('.board [data-square="f7"] .token.unaffected').count()) === 1, `${tag} an unaffected piece carries a small neutral mark`);
-  await local.screenshot({ path: `${out}/e2e-${size}-checkmate.png` });
+  await playLine(local, ["a7a6", "f7e8"]);
+  check((await sanList(local)).at(-1) === "Qxe8#", `${tag} the queen takes the king: Qxe8#`);
+  check((await local.locator(".modal-dialog h2").innerText()) === "White wins!", `${tag} capturing the king ends the game for White`);
+  check((await local.locator(".modal-dialog .modal-copy p").innerText()).includes("captured"), `${tag} the dialog says the king was captured`);
+  await local.getByRole("button", { name: "View board" }).click();
+  await local.screenshot({ path: `${out}/e2e-${size}-king-captured.png` });
 
   await openLocal(local, APP, { rules: "reactions", dice: [4] });
   await playLine(local, ["e2e4", "d7d5", "e4d5", "c7c6", "d5c6", "g8f6", "c6b7", "b8d7"]);
@@ -274,6 +277,11 @@ for (const size of Object.keys(SIZES)) {
   await white.screenshot({ path: `${out}/e2e-${size}-online-roll.png` });
   // A 6 leaves White on move: End turn must work online too.
   const endTurn = white.locator('[data-testid="end-turn"]');
+  // Wait until either the turn has passed or White has been offered the extra move.
+  await Promise.race([
+    black.waitForSelector("text=Your move", { timeout: 10000 }).catch(() => {}),
+    white.waitForSelector('[data-testid="end-turn"]', { timeout: 10000 }).catch(() => {})
+  ]);
   if (await endTurn.count()) {
     await endTurn.click();
     check(true, `${tag} (the server rolled a 6: End turn was offered and sent)`);

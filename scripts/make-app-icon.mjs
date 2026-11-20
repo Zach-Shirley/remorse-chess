@@ -1,11 +1,11 @@
 // Renders the source images @capacitor/assets turns into every iOS/Android icon and splash size.
-// The knight comes from art/knight-icon.png, a 1024px render from art/studio.js.
+// The knight comes from art/piece-icon.png, a 1024px render from art/studio.js.
 // Run: npm run mobile:icons
 import { mkdirSync } from "node:fs";
 import sharp from "sharp";
 
-const dark = "#3f5668";
-const light = "#e4dac7";
+const dark = "#476078";
+const light = "#d4c4a4";
 const night = "#0a0607";
 
 // A 2x2 board corner. Apple masks the corners itself, so no rounding here.
@@ -39,14 +39,14 @@ async function icon(source, output) {
 }
 
 {
-  await icon("art/knight-icon.png", "assets/icon-only.png");
-  const { knight } = await knightLayer("art/knight-icon.png", 600);
+  await icon("art/piece-icon.png", "assets/icon-only.png");
+  const { knight } = await knightLayer("art/piece-icon.png", 600);
   await sharp({ create: { width: 1024, height: 1024, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
     .composite([{ input: knight, left: 212, top: 200 }])
     .png()
     .toFile("assets/icon-foreground.png");
   await sharp({ create: { width: 1024, height: 1024, channels: 4, background: dark } }).png().toFile("assets/icon-background.png");
-  const splashKnight = (await knightLayer("art/knight-icon.png", 640)).knight;
+  const splashKnight = (await knightLayer("art/piece-icon.png", 640)).knight;
   for (const file of ["assets/splash.png", "assets/splash-dark.png"]) {
     await sharp({ create: { width: 2732, height: 2732, channels: 4, background: night } })
       .composite([{ input: splashKnight, left: 1046, top: 1046 }])

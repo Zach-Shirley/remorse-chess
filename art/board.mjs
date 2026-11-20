@@ -3,8 +3,8 @@
 // The colours here must match --board-light / --board-dark in src/theme/tokens.css.
 import sharp from "sharp";
 
-const LIGHT = "#e4dac7";
-const DARK = "#3f5668";
+const LIGHT = "#d4c4a4";
+const DARK = "#476078";
 const size = 1200;
 const cell = size / 8;
 

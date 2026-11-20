@@ -29,8 +29,8 @@
   --warn: #ff8f6b;
 
   /* Board (keep in step with art/board.mjs) */
-  --board-light: #e4dac7;
-  --board-dark: #3f5668;
+  --board-light: #d4c4a4;
+  --board-dark: #476078;
   --board-frame-top: #24121a;
   --board-frame-bottom: #0d0709;
   --side-red: #d3202f;

@@ -9,12 +9,15 @@ export const CREATOR = {
   instagram: "https://www.instagram.com/bardelo_bardalini/"
 };
 
-export const VIDEOS: { id: number; title: string; url: string }[] = [
-  { id: 1, title: "Remorse Chess", url: "https://www.youtube.com/shorts/H-JyKN_1jM4" },
-  { id: 2, title: "Remorse Chess: Psychos & Devastation", url: "https://www.youtube.com/shorts/_ySYb2fEvRQ" },
-  { id: 3, title: "Remorse Chess: Announcement & Reclassification", url: "https://www.youtube.com/shorts/mm3rmrhY_KM" },
-  { id: 4, title: "Remorse Chess: Reactions to Attacks Pt. 1", url: "https://www.youtube.com/shorts/DJ3hAbNY6vc" },
-  { id: 5, title: "Remorse Chess: Reactions to Attack Pt. 2", url: "https://www.youtube.com/shorts/UYv9RKw2zWI" }
+// `label` says what the video covers. The app shows labels, not the videos' own titles: the
+// second video's title uses the name the creator withdrew in the third, where he renamed that
+// reaction "Sadist". (The README's attribution gives the titles as published.)
+export const VIDEOS: { id: number; label: string; url: string }[] = [
+  { id: 1, label: "The base rules: guilt and absolution", url: "https://www.youtube.com/shorts/H-JyKN_1jM4" },
+  { id: 2, label: "Capture reactions: the D6, devastation, bloodlust", url: "https://www.youtube.com/shorts/_ySYb2fEvRQ" },
+  { id: 3, label: "The rename to Sadist", url: "https://www.youtube.com/shorts/mm3rmrhY_KM" },
+  { id: 4, label: "Reactions to attacks, part 1: witnesses", url: "https://www.youtube.com/shorts/DJ3hAbNY6vc" },
+  { id: 5, label: "Reactions to attacks, part 2: vendetta", url: "https://www.youtube.com/shorts/UYv9RKw2zWI" }
 ];
 
 export type RuleLine = {

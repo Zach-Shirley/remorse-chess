@@ -4,7 +4,7 @@ import { LocalGamePage } from "./components/LocalGamePage";
 import { MultiplayerPage } from "./components/MultiplayerPage";
 import type { BotLevel } from "./bot";
 import { resolveColorChoice } from "./ui/ColorPicker";
-import { DEFAULT_GAME_RULES, opponentOf, type GameRules, type Player } from "./game";
+import { normalizeRules, opponentOf, type GameRules, type Player } from "./game";
 import type { ColorChoice } from "./multiplayer/protocol";
 
 type AppRoute = "/" | "/local" | "/bot" | "/multiplayer";
@@ -19,9 +19,15 @@ function getRoute(): AppRoute {
   return "/";
 }
 
+// A direct link may name the rule set: /local?rules=witnesses (the home screen's picker is the
+// normal way in; the browser check scripts use the link).
+function rulesFromAddress(): GameRules {
+  return normalizeRules({ ruleSet: new URLSearchParams(window.location.search).get("rules") });
+}
+
 export function App() {
   const [route, setRoute] = useState<AppRoute>(getRoute);
-  const [localRules, setLocalRules] = useState<GameRules>(DEFAULT_GAME_RULES);
+  const [localRules, setLocalRules] = useState<GameRules>(rulesFromAddress);
   const [localSession, setLocalSession] = useState(0);
   const [botLevel, setBotLevel] = useState<BotLevel>("medium");
   const [botPlayer, setBotPlayer] = useState<Player>("black");

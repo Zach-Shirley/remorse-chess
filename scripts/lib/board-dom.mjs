@@ -14,8 +14,21 @@ export const moveCount = (page) => page.locator(".moves-heading span").innerText
 export const turnTitle = (page) => page.locator(".turn-status p").innerText();
 export const isGameOver = async (page) => (await turnTitle(page)) === "Game over";
 
-// The move list as SAN strings, in order.
-export const sanList = (page) => page.locator(".move-list .move-san").allInnerTexts();
+// The move list as SAN strings, in order (without the dice and event chips drawn beside them).
+export const sanList = (page) =>
+  page.locator(".move-list .move-part").evaluateAll((parts) => parts.map((part) => part.dataset.san));
+
+// A piece's conscience as the board announces it ("guilt-ridden", "vendetta against pawns"), or "".
+export const statusOf = async (page, name) => (await square(page, name).getAttribute("data-status")) ?? "";
+
+// The lines of the roll card currently on screen.
+export const rollCard = (page) => page.locator(".roll-card .roll-line").allInnerTexts();
+
+// Opens a pass-and-play game directly. `dice` scripts the first rolls (see src/dice.ts).
+export async function openLocal(page, base, { rules = "reactions", dice = [] } = {}) {
+  await page.goto(`${base}/local?rules=${rules}${dice.length ? `&dice=${dice.join(",")}` : ""}`);
+  await page.waitForSelector(".board");
+}
 
 // Plays one move by clicking its squares. `promotion` picks the piece when the picker opens.
 export async function clickMove(page, from, to, promotion = "queen") {
@@ -100,10 +113,11 @@ export function watchErrors(page, label, errors) {
   page.on("pageerror", (error) => errors.push(`${label}: ${error.message}`));
 }
 
-// Creates a private room on `host` (playing `hostSide`) and joins it from `guest`.
-export async function openRoom(host, guest, base, hostSide = "White") {
+// Creates a private room on `host` (playing `hostSide`, with `ruleSet`) and joins it from `guest`.
+export async function openRoom(host, guest, base, hostSide = "White", ruleSet = null) {
   await host.goto(`${base}/multiplayer`);
   await host.waitForSelector(".server-state.online", { timeout: 90000 });
+  if (ruleSet) await host.locator(`[data-rule-set="${ruleSet}"]`).click();
   await host.getByRole("radio", { name: hostSide }).click();
   await host.getByRole("button", { name: "Create private room" }).click();
   await host.waitForSelector("text=Waiting for an opponent");

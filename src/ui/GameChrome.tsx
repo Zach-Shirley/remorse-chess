@@ -99,7 +99,7 @@ function MoveCell({ entries, side, latest }: { entries: MoveLogEntry[]; side: Pl
   return (
     <span className={`move-san ${side} ${latest && entries.includes(latest) ? "latest" : ""}`}>
       {entries.map((entry, index) => (
-        <span className="move-part" key={index}>
+        <span className="move-part" key={index} data-san={entry.notation}>
           {entry.notation}
           {entry.events.map((event, eventIndex) =>
             event.type === "extra-move" ? null : <EventChip key={eventIndex} line={describeEvent(event)} />

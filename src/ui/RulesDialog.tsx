@@ -47,7 +47,7 @@ function VideoRefs({ videos }: { videos: number[] }) {
         const video = VIDEOS.find((entry) => entry.id === id);
         if (!video) return null;
         return (
-          <a key={id} href={video.url} target="_blank" rel="noreferrer" title={`Source: "${video.title}"`}>
+          <a key={id} href={video.url} target="_blank" rel="noreferrer" title={`Source: video ${id}. ${video.label}`}>
             video {id}
           </a>
         );
@@ -130,7 +130,7 @@ export function RulesDialog({ onClose, ruleSet }: { onClose: () => void; ruleSet
               <li key={video.id}>
                 <a href={video.url} target="_blank" rel="noreferrer">
                   <span>Video {video.id}</span>
-                  {video.title}
+                  {video.label}
                   <ExternalLink aria-hidden="true" size={14} />
                 </a>
               </li>

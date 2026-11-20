@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { io as createClient, type Socket } from "socket.io-client";
 import { createGameServer } from "../server/game-server";
 import { getLegalMoves } from "../src/game";
+import { scriptedDice } from "../src/variant/remorse";
 import type {
   ClientToServerEvents,
   CreateRoomPayload,
@@ -336,6 +337,97 @@ describe("multiplayer game server", () => {
     expect(first.snapshot.code).toBe(second.snapshot.code);
     // Colors are random, but the two players always get opposite ones.
     expect([first.session.player, second.session.player].sort()).toEqual(["black", "white"]);
+  });
+
+  it("only pairs quick-match clients that asked for the same rule set", async () => {
+    const classicClient = await newClient();
+    const witnessesClient = await newClient();
+    const secondClassicClient = await newClient();
+
+    expect(await joinMatchmaking(classicClient, { name: "A", rules: { ruleSet: "classic" } })).toEqual({
+      ok: true,
+      data: { queued: true }
+    });
+    // A different rule set: queued beside the first player, not matched with them.
+    expect(await joinMatchmaking(witnessesClient, { name: "B", rules: { ruleSet: "witnesses" } })).toEqual({
+      ok: true,
+      data: { queued: true }
+    });
+
+    const matched = waitForMatch(classicClient);
+    expect(await joinMatchmaking(secondClassicClient, { name: "C", rules: { ruleSet: "classic" } })).toEqual({
+      ok: true,
+      data: { queued: false }
+    });
+    const connection = await matched;
+    expect(connection.snapshot.rules).toEqual({ ruleSet: "classic" });
+    expect(connection.snapshot.game.rules).toEqual({ ruleSet: "classic" });
+  });
+
+  it("tells the joiner the room's rule set and never accepts plain chess", async () => {
+    const hostClient = await newClient();
+    const room = await createRoom(hostClient, { name: "Host", rules: { ruleSet: "witnesses" } });
+    const joined = await joinRoom(await newClient(), { name: "Guest", code: room.snapshot.code });
+    expect(joined.snapshot.rules).toEqual({ ruleSet: "witnesses" });
+    expect(joined.snapshot.game.rules).toEqual({ ruleSet: "witnesses" });
+
+    const sneaky = await createRoom(await newClient(), { name: "Sneaky", rules: { ruleSet: "plain" } as never });
+    expect(sneaky.snapshot.rules).toEqual({ ruleSet: "reactions" });
+  });
+
+  it("rolls the dice on the server and sends the same rolls to both players", async () => {
+    await gameServer.close();
+    // The server's dice, scripted: the capturer rolls 6 (Sadist), the witness on e6 rolls 5.
+    gameServer = createGameServer(undefined, { dice: scriptedDice(6, 5) });
+    const port = await gameServer.listen(0);
+    serverUrl = `http://127.0.0.1:${port}`;
+
+    const whiteClient = await newClient();
+    const blackClient = await newClient();
+    const room = await createRoom(whiteClient, { name: "White", rules: { ruleSet: "witnesses" }, color: "white" });
+    await joinRoom(blackClient, { name: "Black", code: room.snapshot.code });
+
+    for (const [client, moveId] of [[whiteClient, "e2e4"], [blackClient, "e7e6"], [whiteClient, "d2d4"], [blackClient, "d7d5"]] as const) {
+      expect(await move(client, moveId)).toEqual({ ok: true, data: null });
+    }
+
+    const whiteSees = waitForState(whiteClient, (state) => state.game.moveLog.length === 5);
+    const blackSees = waitForState(blackClient, (state) => state.game.moveLog.length === 5);
+    // The client sends a move id and nothing else: it has no way to send a roll.
+    expect(await move(whiteClient, "e4d5")).toEqual({ ok: true, data: null });
+    const [whiteState, blackState] = await Promise.all([whiteSees, blackSees]);
+
+    expect(whiteState.game).toEqual(blackState.game);
+    expect(whiteState.game.moveLog[4].events).toEqual([
+      expect.objectContaining({ type: "roll", cause: "capture", value: 6, outcome: "sadist" }),
+      expect.objectContaining({ type: "roll", cause: "witness", value: 5, outcome: "vendetta", target: "pawn" }),
+      expect.objectContaining({ type: "extra-move" })
+    ]);
+
+    // The Sadist's extra move: White is still to move, Black is refused, and White may pass.
+    expect(whiteState.game.currentPlayer).toBe("white");
+    expect(await move(blackClient, "a7a6")).toEqual({ ok: false, message: "It is not your turn." });
+    expect(await move(blackClient, "pass")).toEqual({ ok: false, message: "It is not your turn." });
+    const passed = waitForState(blackClient, (state) => state.game.currentPlayer === "black");
+    expect(await move(whiteClient, "pass")).toEqual({ ok: true, data: null });
+    expect((await passed).game.moveLog).toHaveLength(5);
+    // Passing is not a move a player can make at any other time.
+    expect(await move(blackClient, "pass")).toEqual({ ok: false, message: "That move is no longer legal." });
+  });
+
+  it("uses real dice by default: every roll is a number from 1 to 6", async () => {
+    const whiteClient = await newClient();
+    const blackClient = await newClient();
+    const room = await createRoom(whiteClient, { name: "White", rules: { ruleSet: "reactions" }, color: "white" });
+    await joinRoom(blackClient, { name: "Black", code: room.snapshot.code });
+    for (const [client, moveId] of [[whiteClient, "e2e4"], [blackClient, "d7d5"]] as const) {
+      expect(await move(client, moveId)).toEqual({ ok: true, data: null });
+    }
+    const captured = waitForState(blackClient, (state) => state.game.moveLog.length === 3);
+    expect(await move(whiteClient, "e4d5")).toEqual({ ok: true, data: null });
+    const roll = (await captured).game.moveLog[2].events[0];
+    expect(roll).toMatchObject({ type: "roll", cause: "capture" });
+    expect(roll.type === "roll" && Number.isInteger(roll.value) && roll.value >= 1 && roll.value <= 6).toBe(true);
   });
 
   it("lets the room creator choose Black and seats the joiner as White", async () => {

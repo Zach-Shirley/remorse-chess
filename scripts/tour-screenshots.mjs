@@ -2,12 +2,15 @@
 // screenshots. Exits non-zero if the browser logged any console error.
 // Usage: node scripts/tour-screenshots.mjs <baseUrl> <outDir>
 // Online screens need the game server that <baseUrl> is configured for to be reachable.
+// Pass-and-play games here script their first dice through the page address (see src/dice.ts),
+// so the same reactions show every run. The online game uses the server's real dice.
 import { mkdirSync } from "node:fs";
 import { chromium } from "playwright";
 import {
   SIZES,
   clickMove,
   isGameOver,
+  openLocal,
   playAnyLegalMove,
   playLine,
   playOnlineLine,
@@ -40,6 +43,8 @@ for (const size of Object.keys(SIZES)) {
   await shot(page, `${size}-1-home`);
   await page.getByText("How to play").click();
   await shot(page, `${size}-1b-rules`);
+  await page.locator('[data-rules="interpretation"]').scrollIntoViewIfNeeded();
+  await shot(page, `${size}-1c-rules-interpretation`);
   await page.getByRole("button", { name: "Got it" }).click();
   await page.getByText("Play a Bot").click();
   await shot(page, `${size}-2-bot-setup`);
@@ -51,7 +56,7 @@ for (const size of Object.keys(SIZES)) {
   await waitForTurn(page, "white");
   await clickMove(page, "g1", "f3");
   await waitForTurn(page, "white");
-  for (let turn = 0; turn < 6 && !(await isGameOver(page)); turn += 1) {
+  for (let turn = 0; turn < 8 && !(await isGameOver(page)); turn += 1) {
     await playAnyLegalMove(page, "white", random);
     await waitForTurn(page, "white");
   }
@@ -65,28 +70,66 @@ for (const size of Object.keys(SIZES)) {
   }
   await shot(page, `${size}-3-bot-game`);
 
-  // Pass & play: a check, then scholar's mate for the game-over popup
+  // Pass & play setup, with the rule-set picker
   await page.goto(base);
   await page.getByText("Pass & Play").click();
+  await shot(page, `${size}-4-local-setup`);
+
+  // Witnesses: a capture, the capturer's roll and a witness's vendetta on one card
+  await openLocal(page, base, { rules: "witnesses", dice: [4, 5, 1] });
+  await playLine(page, ["e2e4", "e7e6", "d2d4", "d7d5", "e4d5"]);
+  await shot(page, `${size}-5-roll-card`);
+  // The vendetta is collected; White's d4 pawn witnesses it and is shaken. Tap it to read why.
+  await playLine(page, ["e6d5"]);
+  await page.waitForSelector(".roll-card", { state: "detached", timeout: 10000 });
+  await square(page, "d4").click();
+  await shot(page, `${size}-5b-guilt-ridden`);
+  // The bishop lands next to it: absolved.
+  await playLine(page, ["f1d3"]);
+  await shot(page, `${size}-5c-absolution`);
+
+  // Reactions: a 6 makes a Sadist, which may move again or end the turn
+  await openLocal(page, base, { rules: "reactions", dice: [6] });
+  await playLine(page, ["e2e4", "d7d5", "e4d5"]);
+  await page.waitForSelector(".roll-card", { state: "detached", timeout: 10000 });
+  await shot(page, `${size}-5d-sadist-extra-move`);
+
+  // Reactions: a 1 devastates the capturer; the countdown shows on the piece
+  await openLocal(page, base, { rules: "reactions", dice: [1] });
+  await playLine(page, ["e2e4", "d7d5", "e4d5", "a7a6", "a2a3", "b7b6"]);
+  await square(page, "d5").click();
+  await shot(page, `${size}-5e-devastated`);
+
+  // A check, then scholar's mate for the game-over popup (the queen rolls a 4: unaffected)
+  await openLocal(page, base, { rules: "reactions", dice: [4] });
   await playLine(page, ["e2e4", "e7e5", "f1c4", "b8c6", "d1h5", "g8f6", "h5f7"]);
-  await shot(page, `${size}-4-game-over`);
+  await shot(page, `${size}-6-game-over`);
   await page.getByRole("button", { name: "View board" }).click();
-  await shot(page, `${size}-4b-checkmate-board`);
+  await shot(page, `${size}-6b-checkmate-board`);
+
+  // Promotion picker
+  await openLocal(page, base, { rules: "reactions", dice: [4] });
+  await playLine(page, ["e2e4", "d7d5", "e4d5", "c7c6", "d5c6", "g8f6", "c6b7", "b8d7"]);
+  await square(page, "b7").click();
+  await square(page, "a8").click();
+  await page.waitForSelector(".promotion-options");
+  await shot(page, `${size}-6c-promotion`);
 
   // Online: lobby, quick match, waiting room, and a game between two browsers
   await page.goto(`${base}/multiplayer`);
   await page.waitForSelector("text=Playing as", { timeout: 90000 });
   await page.waitForSelector(".server-state.online", { timeout: 90000 });
-  await shot(page, `${size}-5-lobby`);
+  await shot(page, `${size}-7-lobby`);
   await page.getByRole("button", { name: "Find match" }).click();
   await page.waitForSelector("text=Looking for a player");
-  await shot(page, `${size}-5b-quick-match`);
+  await shot(page, `${size}-7b-quick-match`);
   await page.getByRole("button", { name: "Cancel search" }).click();
   await page.waitForSelector("text=Playing as");
+  await page.locator('[data-rule-set="witnesses"]').click();
   await page.getByRole("radio", { name: "White" }).click();
   await page.getByRole("button", { name: "Create private room" }).click();
   await page.waitForSelector("text=Waiting for an opponent");
-  await shot(page, `${size}-6-waiting-room`);
+  await shot(page, `${size}-8-waiting-room`);
   const code = (await page.locator(".room-code-display span").innerText()).trim();
   const guest = await open(size, `${size}-guest`);
   await guest.goto(`${base}/multiplayer`);
@@ -97,24 +140,18 @@ for (const size of Object.keys(SIZES)) {
   await page.waitForSelector("text=Your move", { timeout: 20000 });
   await guest.getByRole("button", { name: "Good luck!" }).click();
   await page.getByRole("button", { name: "Thanks!" }).click();
-  await playOnlineLine(page, guest, ["e2e4", "d7d5", "e4d5", "c7c6", "d5c6", "g8f6", "c6b7", "b8d7"]);
-  await page.waitForSelector("text=Your move");
-  await page.waitForFunction(() => document.querySelectorAll(".board .movable-square").length > 0);
-  await square(page, "b7").click();
-  await shot(page, `${size}-7-online-game`);
+  // The capture on d5 is rolled by the server; whatever it shows, both players see the card.
+  await playOnlineLine(page, guest, ["e2e4", "e7e6", "d2d4", "d7d5", "e4d5"]);
+  await guest.waitForSelector(".roll-card", { timeout: 8000 });
+  await shot(guest, `${size}-9-online-game`);
   if (size === "phone") {
     await page.locator(".chat-section").scrollIntoViewIfNeeded();
-    await shot(page, `${size}-8-online-chat`);
+    await shot(page, `${size}-9b-online-chat`);
   }
-  await square(page, "a8").click();
-  await page.waitForSelector(".promotion-options");
-  await shot(page, `${size}-8b-promotion`);
-  await page.locator('.promotion-options [data-promotion="queen"]').click();
-  await guest.waitForSelector("text=Your move");
   await guest.locator(".danger-action").click();
   await guest.locator(".modal-dialog .button.danger").click();
   await page.waitForSelector(".result-event", { timeout: 10000 });
-  await shot(page, `${size}-9-online-result`);
+  await shot(page, `${size}-9c-online-result`);
   await page.context().close();
   await guest.context().close();
 }

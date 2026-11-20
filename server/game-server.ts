@@ -709,7 +709,7 @@ if (isDirectRun) {
   gameServer
     .listen()
     .then((port) => {
-      process.stdout.write(`Chess game server listening on ${host}:${port}\n`);
+      process.stdout.write(`Remorse Chess game server listening on ${host}:${port}\n`);
     })
     .catch((error: unknown) => {
       process.stderr.write(`${String(error)}\n`);

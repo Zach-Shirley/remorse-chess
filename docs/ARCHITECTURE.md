@@ -1,175 +1,146 @@
-# Architecture and fork notes
+# Architecture
 
-This repository is a complete game of standard chess, built to be forked into chess variants. This page says where the rules live, what a variant changes, and what it should leave alone.
+Remorse Chess is a standard chess engine with one variant layered on it, a bot, a room server and a shared UI kit. This page says where each rule lives and how the parts depend on each other.
 
 ## Layers
 
 ```
-src/game.ts              rules engine (pure TypeScript, no UI)          the variant's main file
-src/bot.ts               search + evaluation over the rules engine      search is generic, evaluate() is chess
-server/rules.ts          the rules surface the room server uses         thin adapter
-server/game-server.ts    rooms, matchmaking, reconnects, chat           shared, game-agnostic
-src/multiplayer/         protocol types, socket client, name generator  shared
-src/ui/                  board, pieces, player bars, dialogs, pickers   shared kit
-src/components/          the three screens: home, local/bot, online     shared
-src/theme/               all CSS; tokens.css holds every design token   restyle here
-art/                     3D studio that renders the sprites             models + pipeline
-scripts/                 browser end-to-end checks and screenshots      shared
+src/game.ts                   chess engine: moves, check, draws, notation; calls the variant
+src/variant/interpretation.ts every ruling the creator's videos leave open, as named constants
+src/variant/remorse.ts        consciences, dice, what a move sets off, who may capture and check
+src/variant/describe.ts       words for statuses and events (toasts, move list, screen readers)
+src/variant/rulesText.ts      the rules as shown in the rules dialog, with their video sources
+src/bot.ts                    search + evaluation over the engine
+src/dice.ts                   dice for games on this device (Math.random, scriptable by address)
+server/rules.ts               what the room server uses from the game, and the server's dice
+server/game-server.ts         rooms, matchmaking, reconnects, chat (game-agnostic)
+src/multiplayer/              protocol types, socket client, name generator
+src/ui/                       board, pieces, player bars, dialogs, pickers; Conscience.tsx
+src/components/               the three screens: home, local/bot, online
+src/theme/                    all CSS; tokens.css holds every design token; remorse.css the variant's
+art/                          3D studio that renders the sprites, hero and icon
+scripts/                      browser end-to-end checks and screenshots
 ```
 
-The engine is deterministic and has no clock: the same state and move always give the same next state. The client, the bot and the server all run the same `src/game.ts`, so they cannot disagree about a rule.
+The client, the bot and the server all run the same `src/game.ts`, so they cannot disagree about a rule.
 
-## The rules engine (`src/game.ts`)
+## Where each kind of rule lives
 
-### State
+| Kind | Where | Example |
+|---|---|---|
+| What the creator says | `src/variant/remorse.ts`, marked `VERIFIED (video n)` | the capture table `captureReaction`, the witness table `witnessReaction` |
+| What he leaves open | `src/variant/interpretation.ts` only | `ADJACENCY = 8`, `DEVASTATION_TURNS`, `EXTRA_MOVE_IS_OPTIONAL` |
+| The same, in words | `src/variant/rulesText.ts` (`RULES_BY_SET`, `INTERPRETATIONS`) and the README | the rules dialog renders these lists |
 
-`GameState` is plain JSON (it is sent to both clients as-is):
+`remorse.ts` never decides an open question itself: it reads a constant from `interpretation.ts`. Changing a ruling means editing that constant, the matching sentence in `rulesText.ts` and the README table, and the test that pins it in `tests/remorse.test.ts`.
+
+## State
+
+`GameState` is plain JSON (it is sent to both clients as-is).
 
 | Field | Meaning |
 |---|---|
 | `board` | 8×8 array of `Piece \| null`. Row 0 is rank 8, column 0 is the a-file. |
-| `currentPlayer` | `"white"` or `"black"`. White moves first. |
-| `castling`, `enPassant`, `halfmoveClock`, `fullmoveNumber` | the rest of a FEN |
-| `positionCounts` | repetition counts since the last capture or pawn move |
-| `rules` | the `GameRules` the game was created with |
-| `moveLog` | one `MoveLogEntry` per half-move, with its SAN text in `notation` |
-| `status` | `{ phase: "playing", check }`, `{ phase: "won", winner, reason }` or `{ phase: "draw", reason }`, each with a `message` |
+| `currentPlayer`, `castling`, `enPassant`, `halfmoveClock`, `fullmoveNumber` | as in a FEN |
+| `positionCounts` | repetition counts since the last irreversible move; the key includes the consciences |
+| `rules` | `{ ruleSet: "classic" \| "reactions" \| "witnesses" }` (`"plain"` exists for tests only) |
+| `minds` | the consciences, by piece id; only pieces with something on their mind have an entry |
+| `extraMove` | set while a Sadist's extra move is pending: the same player is still to move |
+| `moveLog` | one entry per move, with its SAN `notation` and the `events` it set off |
+| `lastEvents`, `actionCount` | what the latest action set off, and a counter so the UI shows each event once |
+| `status` | playing / won (`checkmate`, `resignation`, `despair`) / draw |
 
-A `Piece` is `{ id, player, kind }`. Ids are stable for the whole game, including through promotion; the UI keys its animations on them.
+A `Mind` holds `reaction` (the lifelong die result), `affliction` (`guilty` or `devastated`), `temporary` (it came from witnessing), `turnsLeft` (devastation countdown), `penance` (a bishop's self-absolution), `captures`, `bloodlust` and `vendetta` (a piece kind).
 
-A `Move` has an `id` in long algebraic form (`"e2e4"`, `"e7e8q"`), the moving piece, `from`, `to`, `captures` (zero or one square, which differs from `to` only for en passant) and the optional `promotion`, `castle`, `rook` and `enPassant` fields.
+A `GameEvent` is one of: `roll` (cause `capture` or `witness`, with the piece, the value and the outcome), `relapse` (guilt or devastation without a die), `absolved`, `self-absolved`, `removed`, `bloodlust`, `vendetta-used`, `extra-move`.
 
-### Two layers of move generation
+## How a move is played
 
 ```
-getPseudoLegalMoves(state, player?, MoveGenOptions?)   how pieces move, no check rules at all
-isSquareAttacked(state, square, byPlayer, AttackOptions?)
-isLegalMove(state, move, AttackOptions?)               the check rules, built on isSquareAttacked
-generateLegalMoves(state, player?, overrides?)         layer 1 filtered by layer 2
+applyMove(state, moveId, rng)
+  getLegalMoves                      layer 1 (piece movement) filtered by layer 2 (check rules),
+                                     both under REMORSE_OPTIONS
+  makeBoardMove                      standard chess: the pieces, castling rights, en passant, clocks
+  resolveMove (remorse.ts)           1. the capturer: vendetta spent, or reaction rolled/re-applied
+                                     2. witnesses roll (Witnesses only), in board order
+                                     3. a healthy bishop that just landed absolves its neighbours
+                                     4. a Sadist's first capture of the turn: extra move pending, stop
+                                     5. otherwise finishTurn: the mover's penances and countdowns
+                                        tick; the opponent's expired pieces remove themselves
+  evaluateStatus                     check, checkmate, stalemate and draws for whoever moves next
 ```
 
-- **Layer 1** knows piece movement, captures, double pushes, en passant, promotion, and castling by rights and empty squares only.
-- **Layer 2** knows that a king may not be left attacked, and that a king may not castle out of or through an attacked square.
+`applyMove(state, PASS_MOVE_ID)` ends a pending extra move (step 5 only). `makeMove` is the same pipeline without the log and status, for the bot's search.
 
-Both layers take options, so a variant can recombine them without rewriting them:
+### The seam into move generation
 
-| Option | Where | Effect |
+The chess generator takes options, and Remorse Chess is one options object (`REMORSE_OPTIONS` in `remorse.ts`, returned by `variantOptions` in `game.ts`):
+
+| Option | Layer | Remorse Chess uses it for |
 |---|---|---|
-| `canCapture(attacker, target, at, state)` | `MoveGenOptions` | which enemy pieces a piece may capture |
-| `canMove(piece, from, state)` | `MoveGenOptions` | which pieces may move at all |
-| `tacticalOnly` | `MoveGenOptions` | only captures and promotions (the bot's quiescence search) |
-| `canAttack(piece, from, state)` | `AttackOptions` | which pieces count as attackers (others still block) |
-| `isTransparent(piece, at, state)` | `AttackOptions` | pieces that sliding attacks pass through |
-| `checkRules: false` | `LegalityOptions` | no check rules: every pseudo-legal move is legal |
+| `canMove` | moves | devastated pieces cannot move; during an extra move only the Sadist may |
+| `canCapture` | moves | guilt-ridden pieces capture nothing (except a vendetta's target); nothing captures a king |
+| `canCaptureFriendly` | moves | bloodlust |
+| `capturesOnly` | moves | bloodlust |
+| `canAttack` | attacks | guilt-ridden and devastated pieces give no check and do not stop castling |
 
-### The variant seam
+Legality (`isLegalMove`) only needs the bare board move: no die can make an enemy piece more dangerous to the mover's king, so whether a move is legal never depends on a roll.
 
-Everything that asks "what is legal here?" goes through one function:
+`PLAIN_CHESS_RULES` switches all of this off. `tests/plain.ts` wraps the engine with it so the perft and standard-chess tests keep checking the generator itself.
 
-```ts
-export function variantOptions(state: GameState): LegalityOptions {
-  return {};            // plain chess
-}
-```
+## Dice
 
-`getLegalMoves`, `applyMove`, the status after each move (`evaluateStatus`) and the bot all read it. Two examples:
+The engine never calls `Math.random`. `applyMove` and `makeMove` take an `Rng` (a function shaped like `Math.random`), and `rollDie` turns it into a face.
 
-```ts
-// Attacks that ignore certain pieces (they cannot give check, and cannot capture):
-return {
-  attacks: { canAttack: (piece) => !isStunned(state, piece) },
-  moves: { canCapture: (attacker) => !isStunned(state, attacker) }
-};
-
-// No check rules at all (the king can be left en prise; decide the win in evaluateStatus):
-return { checkRules: false };
-```
-
-With `checkRules: false` nothing ends the game by checkmate, so the variant also edits `evaluateStatus` (for example: a side with no king has lost).
-
-### What else a rules change touches
-
-- **New state** (a counter, a per-piece flag): add the field to `GameState`, initialise it in `fromFen`, and update it in `makeMove`. `makeMove` is the single place a move changes the position; `applyMove` wraps it with the legality check, the move log, the repetition count and the status.
-- **New ways to end the game:** `evaluateStatus`. Add the reason to `GameStatus` and a title in `src/ui/GameOverDialog.tsx` (`DRAW_TITLES`, `resultTitle`).
-- **A rules option:**
-  1. add the field to `GameRules`, its default to `DEFAULT_GAME_RULES`, and its sanitising to `normalizeRules` (the server calls this on anything a client sends);
-  2. read it in the engine as `state.rules.yourOption`;
-  3. give the player a control. `HomePage` and `MultiplayerLobby` each hold a `rules` constant that is passed to every "start" callback: turn it into state and render a `setting-toggle` (the styles are in `base.css`). Quick match only pairs players whose rules are equal (`sameRules` in `server/rules.ts`), and `room:update-rules` lets a host change them before the second player joins.
-- **Notation:** `sanWithoutSuffix` in the engine. The move list prints `MoveLogEntry.notation` verbatim.
-- **Tests:** `tests/perft.test.ts` pins the standard move generator to published node counts. A variant that changes movement should keep a copy of those tests running against the unmodified options, and add its own.
-
-## Randomness and clocks
-
-The engine takes neither, on purpose: it must give the same answer on the client and on the server.
-
-- **A variant that needs randomness** (a die, a shuffled start): the server is the authority. Generate the value in `server/rules.ts` (wrap `createInitialState` or `applyMove` there and pass the value, or a seed stored in `GameState`, into the engine as an argument). Local and bot games do the same in `LocalGamePage` with `Math.random`. Never call `Math.random` inside `src/game.ts`: the bot's search replays moves and would see different results each time.
-- **A variant that needs a clock:** keep timestamps on the server's `GameRoom` (see `disconnectDeadlines` in `server/game-server.ts` for the pattern: a deadline in the snapshot, a `setTimeout` on the server, a countdown hook on the client) and have the server end the game by calling an engine function, the way `resignGame` is called when the disconnect grace runs out.
+- **Online:** `server/game-server.ts` passes `serverDice` (Node's `crypto.randomInt`) into `applyMove`. A client sends a move id and nothing else. `createGameServer(…, { dice })` lets a test script the rolls.
+- **Local and bot games:** `LocalGamePage` passes `createLocalDice()` from `src/dice.ts`: `Math.random`, or the faces listed in the address (`/local?dice=2,4`) followed by `Math.random`. `/local?rules=witnesses` picks the rule set the same way. The browser scripts use both.
+- **No dice passed:** `MODEL_DICE`, where every die shows 3. This is the bot's search model (see below) and is also right for Classic, which has no dice.
+- **Tests:** `scriptedDice(1, 5, …)` shows the given faces and throws when it runs out, so a test also proves that no unexpected roll happened.
 
 ## The bot (`src/bot.ts`)
 
-Iterative-deepening alpha-beta (negamax) with a quiescence search, check extensions and move ordering (captures by most valuable victim, promotions, checks). It reaches the engine only through `getLegalMoves`, `generateLegalMoves`, `makeMove`, `isInCheck` and `applyMove`, so it follows a variant's rules automatically.
+Iterative-deepening alpha-beta (negamax) with a quiescence search, check extensions and move ordering.
 
-Chess-specific and worth revisiting in a variant:
-- `evaluate()`: material, piece-square tables, bishop pair, pawn shield, endgame pawn pushes;
-- the terminal test in `Search.negamax` (no legal moves: checkmate if in check, otherwise a draw);
-- `LEVEL_SETTINGS`: depth, time budget, noise and blunder chance per level.
+- **Randomness.** The search does not branch on dice. It runs on `MODEL_DICE`: a piece making its first capture is assumed to come out guilt-ridden, witnesses are assumed not to react, and pieces whose reaction is already known behave exactly. The real dice are rolled when the chosen move is played. The bot is therefore exact in Classic and optimistic about nothing: it never counts on a 4, 5 or 6.
+- **Extra moves.** After a Sadist's capture the same side is to move, so the search keeps the same point of view and window for that child instead of negating, and adds "end the turn" (`passExtraMove`) as a child. `chooseBotAction` can return `PASS_MOVE_ID`.
+- **Evaluation.** Chess material and piece-square tables, with each piece's value adjusted by its conscience (`mindValue`): guilt costs part of the value, devastation more as the countdown runs out, a Sadist is a small plus, bloodlust a liability, and a devastated king is priced directly.
+- **Levels.** `LEVEL_SETTINGS`: depth, time budget (Hard: 900 ms), noise and blunder chance.
 
-It runs in a web worker (`src/botWorker.ts`, `src/botClient.ts`) so animations stay smooth.
+It runs in a web worker (`src/botWorker.ts`, `src/botClient.ts`).
 
 ## The server
 
-`server/game-server.ts` stores the game state opaquely. It reads only `status.phase` (`"playing"` or not) and `currentPlayer`, and calls only what `server/rules.ts` exports: `applyMove`, `createInitialState`, `resignGame`, `normalizeRules`, `sameRules`. A draw finishes a room exactly like a win, and a rematch works after either.
+`server/game-server.ts` stores the game state opaquely. It reads only `status.phase` and `currentPlayer`, and calls only what `server/rules.ts` exports. Because a pending extra move leaves `currentPlayer` unchanged, the "is it your turn" check needs nothing special.
 
-It provides private rooms with six-character codes, quick match, a side choice for the room creator, per-tab reconnect tokens, a 30-second disconnect grace, rematch votes, quick-message-only chat, generated-name enforcement and private player IDs.
+`normalizeRules` sanitises whatever rule set a client sends (and never accepts `"plain"`). Quick match pairs players whose normalised rules are equal (`sameRules`). The room snapshot carries `rules`, which the client shows to the player who joins.
 
-## The UI kit (`src/ui/`)
+## The UI
 
-- **`Board`** draws `state.board`, flips for Black, and marks selection, legal targets, capture rings, the last move and the checked king. Every square carries `data-square` and `data-piece`, which the browser scripts use.
-- **`PieceToken`** draws one piece and runs its slide or hop. Animation offsets are in cells. Knights hop, everything else slides, and castling slides the rook as the animation's `companion`.
-- **`PromotionPicker`** opens when the clicked destination has more than one move (`movesTo` in `Board.tsx`).
-- **`GameChrome`** has `PlayerBar`, `TurnStatus`, `MoveList` (numbered SAN pairs), `RulesDialog` and `SoundToggle`. The rules text is the `PIECE_RULES` and `RULE_NOTES` lists.
-- `Modal`, `GameOverDialog`, `MaterialStrip`, `ColorPicker`, `BotLevelPicker`.
+Shared kit (`src/ui/`): `Board`, `PieceToken`, `PromotionPicker`, `GameChrome` (`PlayerBar`, `TurnStatus`, `MoveList`, `SoundToggle`), `Modal`, `GameOverDialog`, `MaterialStrip`, `ColorPicker`, `BotLevelPicker`.
 
-### Piece badges and square overlays
+The variant's UI is in two files:
 
-`Board` takes two optional props for per-piece status a variant wants to show:
+- **`src/ui/Conscience.tsx`**
+  - `conscienceBadge(mind)`: the tokens under a piece, passed to `Board`'s `pieceBadge`.
+  - `conscienceSquareClass`, `conscienceAria`: passed to `Board`'s `squareClassName` and `pieceStatus` (which also sets `data-status` on the square for the browser scripts).
+  - `EventFeed`: the roll card. It shows `state.lastEvents` whenever `state.actionCount` rises, and plays the dice, absolution and despair sounds.
+  - `ConscienceNote`: the tapped piece's status in sentences.
+  - `RuleSetPicker`, `useRuleSetChoice` (remembered under `remorse-chess:rule-set`), `RuleSetChip`, `TokenLegend`, `Die`, `EventChip`.
+- **`src/ui/RulesDialog.tsx`**: the rules by rule set with a source link on each rule, the legend, the interpretation list, the credit, and standard chess in brief. It marks which rule sets are in play when opened from a game.
 
-```tsx
-<Board
-  ...
-  pieceBadge={(piece, square) => (isStunned(state, piece) ? <Hourglass size={11} /> : null)}
-  squareClassName={(square, piece) => (isTrap(state, square) ? "trap-square" : "")}
-/>
-```
+`Board` is rendered in `LocalGamePage` and in `OnlineGame` (inside `MultiplayerPage.tsx`); both pass the same three props, render `EventFeed`, and offer End turn through `TurnStatus`'s `action` slot when `canPass(state)`.
 
-- `pieceBadge` returns a small node drawn in the square's corner (`.piece-badge` in `game.css`); it travels with the piece during animations.
-- `squareClassName` adds classes to the square button. Style them next to `.check-square` in `game.css`, using a `::before` layer like the last-move tint.
-
-`Board` is rendered in two places, `LocalGamePage` and `OnlineGame` (in `MultiplayerPage.tsx`); pass the props in both. To swap a piece's artwork by state, extend `pieceSprite` in `PieceToken.tsx`.
+The move list groups entries by turn and side, so a Sadist's two moves share a cell, and draws an `EventChip` for each event next to the move that caused it.
 
 ## Theme tokens
 
-All colours, radii, fonts, shadows and animation timings are CSS custom properties in **`src/theme/tokens.css`**. The other theme files only reference tokens:
+All colours, radii, fonts, shadows and timings are CSS custom properties in `src/theme/tokens.css`. The accent is a deep violet (`--accent`, `--accent-bright`, `--accent-deep`); amber is reserved for "your attention here". The status tokens have their own group (`--guilt`, `--devastated`, `--sadist`, `--bloodlust`, `--unaffected`, `--vendetta`, `--absolved`, each with an `-ink` partner), used by `remorse.css`.
 
-- `base.css`: page, typography, buttons, toggles, segmented pickers, modals, toasts
-- `game.css`: board, pieces and their animations, player bars, side panel, on-board overlays
-- `screens.css`: home, lobby, waiting room, quick-match search
+Two things live outside CSS and are kept in step by hand: the board texture (`art/board.mjs` has the same square colours as `--board-light` / `--board-dark`) and the icon colours in `scripts/make-app-icon.mjs`.
 
-Two things live outside CSS and must be kept in step by hand:
-- the board texture (`art/board.mjs` has the same two square colours as `--board-light` / `--board-dark`)
-- piece materials (`SIDES` in `art/studio.js`)
+## Identity
 
-Fonts are bundled with `@fontsource-variable/unbounded` (display) and `@fontsource-variable/inter` (body), imported in `src/main.tsx`.
-
-## Identity checklist for a fork
-
-Everything here is neutral or a marked placeholder. Search for `CHANGE-ME` and `chess-base`.
-
-- `package.json` name; `index.html` title and description; `public/manifest.webmanifest`
-- storage keys prefixed `chess-base:` (`src/playerIdentity.ts`, `src/sound.ts`, `src/components/MultiplayerPage.tsx`)
-- `PRODUCTION_GAME_SERVER_URL` in `src/platform.ts`; the service name and client origin in `render.yaml`
-- `capacitor.config.ts` (`appId`, `appName`), `android/app/build.gradle`, `android/app/src/main/res/values/strings.xml`, the Java package folder, the bundle ID in `ios/App/App.xcodeproj/project.pbxproj`, the display name in `ios/App/App/Info.plist`, `codemagic.yaml`
-- the home screen copy in `src/components/HomePage.tsx`, and the `service` name in the server's `/health` response
-- `store/` templates, `README.md`
-- dev ports 4274 (web) and 4275 (game server): `package.json`, `server/game-server.ts`, `src/multiplayer/socket.ts`, the scripts' defaults. Change them if two forks run side by side.
-- the icon: `art/piece-icon.png` (rendered by `art/render.mjs`), then `npm run mobile:icons`
+- Package `remorse-chess`; storage keys prefixed `remorse-chess:` (identity, mute, rule set, online session).
+- `PRODUCTION_GAME_SERVER_URL` in `src/platform.ts` and the service name and first client origin in `render.yaml` are best guesses until the game is deployed.
+- App ID `com.example.remorsechess` is a placeholder (`capacitor.config.ts`, `android/app/build.gradle`, Android `strings.xml` and package folder, the iOS project, `codemagic.yaml`). It becomes permanent at the first store upload.
+- Dev ports: 4274 (web), 4275 (game server), 4190 (art studio).

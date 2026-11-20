@@ -1,14 +1,14 @@
-# [GAME NAME] Privacy Policy
+# Remorse Chess Privacy Policy
 
 _Template, not yet published. Fill in the bracketed fields before linking it from a store listing._
 
 Last updated: [DATE]
 
-[GAME NAME] is made by [LLC LEGAL NAME] ("we"). This policy covers the [GAME NAME] app for iPhone and Android and the website at [WEB URL].
+Remorse Chess is made by [LLC LEGAL NAME] ("we"). This policy covers the Remorse Chess app for iPhone and Android and the website at [WEB URL].
 
 ## What we collect
 
-**Nothing that identifies you.** [GAME NAME] has no accounts, no ads, no analytics and no tracking.
+**Nothing that identifies you.** Remorse Chess has no accounts, no ads, no analytics and no tracking.
 
 **Pass & Play** and **games against the bot** run entirely on your device. Nothing is sent anywhere.
 
@@ -31,7 +31,7 @@ The website is hosted by Vercel and the game server by Render. Like any web host
 
 ## Children
 
-[GAME NAME] is suitable for all ages and does not knowingly collect personal information from anyone, including children under 13.
+Remorse Chess is suitable for all ages and does not knowingly collect personal information from anyone, including children under 13.
 
 ## Changes
 

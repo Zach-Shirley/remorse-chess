@@ -10,8 +10,8 @@ Every piece, the board and the home-screen scene are rendered from 3D models, no
   - Every sprite shares one camera frame sized for the king and one floor line, so the pieces keep their relative heights on the board (king tallest, pawn shortest).
 - `render.mjs`: runs the studio in headless Chromium (Playwright, port 4190) and writes the app's assets:
   - `src/assets/pieces/<kind>-<side>.webp`: twelve 288px sprites with a baked contact shadow and a thin dark halo (stronger on ivory, so it stays readable on light squares)
-  - `src/assets/hero.webp`, `hero-tall.webp`: home-screen backdrops, a middlegame on a 3D board
-  - `art/piece-icon.png`: source for the app icon
+  - `src/assets/hero.webp`, `hero-tall.webp`: home-screen backdrops, a middlegame on a 3D board under a violet rim light
+  - `art/piece-icon.png`: source for the app icon (the ivory bishop)
 - `board.mjs`: renders the board surface to `src/assets/board.webp`.
 - `contact-sheet.mjs`: review sheet of every sprite on both square colours, large and at 44px (`art/out/`, not committed).
 - `preview-outline.mjs`: fast 2D check of the knight outline.
@@ -30,7 +30,8 @@ npm run mobile:icons                          # app icons, splash screens and fa
 - Piece colours and gloss: `SIDES` in `studio.js` (`light` and `env` balance the exposure of the pale and dark sides).
 - Proportions: each `build<Piece>` function's profile; `STOCKY` widens all lathed pieces; `KNIGHT_SCALE` sizes the knight; `SPRITE_HALF` is the shared frame.
 - The bishop's cut: `BISHOP_CUT`.
-- Board colours: `LIGHT` / `DARK` in `board.mjs`, mirrored by `--board-light` / `--board-dark` in `src/theme/tokens.css` and by the icon colours in `scripts/make-app-icon.mjs` and the `mobile:icons` script.
+- Board colours: `LIGHT` / `DARK` in `board.mjs`, mirrored by `--board-light` / `--board-dark` in `src/theme/tokens.css`.
+- Icon background: the violet gradient in `scripts/make-app-icon.mjs` and the colours in the `mobile:icons` script, which follow the accent tokens.
 - Knight shape: `KNIGHT_HEAD` in `shapes.mjs`. Check it in 2D first with `node art/preview-outline.mjs`.
 - How large pieces sit in their squares: `.piece-art` in `src/theme/game.css`.
 

@@ -1,14 +1,14 @@
-# Knight Checkers Privacy Policy
+# [GAME NAME] Privacy Policy
 
-_Draft — not yet published. Fill in the bracketed fields before linking it from a store listing._
+_Template, not yet published. Fill in the bracketed fields before linking it from a store listing._
 
 Last updated: [DATE]
 
-Knight Checkers is made by [LLC LEGAL NAME] ("we"). This policy covers the Knight Checkers app for iPhone and Android and the website at https://knight-checkers.vercel.app.
+[GAME NAME] is made by [LLC LEGAL NAME] ("we"). This policy covers the [GAME NAME] app for iPhone and Android and the website at [WEB URL].
 
 ## What we collect
 
-**Nothing that identifies you.** Knight Checkers has no accounts, no ads, no analytics and no tracking.
+**Nothing that identifies you.** [GAME NAME] has no accounts, no ads, no analytics and no tracking.
 
 **Pass & Play** and **games against the bot** run entirely on your device. Nothing is sent anywhere.
 
@@ -31,7 +31,7 @@ The website is hosted by Vercel and the game server by Render. Like any web host
 
 ## Children
 
-Knight Checkers is suitable for all ages and does not knowingly collect personal information from anyone, including children under 13.
+[GAME NAME] is suitable for all ages and does not knowingly collect personal information from anyone, including children under 13.
 
 ## Changes
 

@@ -60,7 +60,7 @@ for (const name of names) {
     const png = await render(name, 768);
     writeFileSync(`art/out/${name}.png`, png);
     // A tight dark halo keeps ivory pieces readable on light squares, then the drop shadow.
-    const shadowed = await withShadow(png, { blur: 14, dy: 12, opacity: 0.5, halo: name.endsWith("white") ? 0.5 : 0.3 });
+    const shadowed = await withShadow(png, { blur: 14, dy: 12, opacity: 0.5, halo: name.includes("white") ? 0.5 : 0.3 });
     await sharp(shadowed).resize(288, 288).webp({ quality: 92, alphaQuality: 100 }).toFile(`src/assets/pieces/${name}.webp`);
   }
   console.log("rendered", name);

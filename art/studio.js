@@ -524,7 +524,8 @@ window.studio = {
   // name: "<kind>-<side>" (for example "queen-white") or "hero".
   render(name, pixels = 512, options = {}) {
     if (name === "hero") return renderHero(pixels, options);
-    const [kind, side] = name.split("-");
+    const [kind, ...rest] = name.split("-");
+    const side = rest.join("-");
     if (!SIDES[side]) throw new Error(`Unknown sprite: ${name}`);
     return renderPiece(kind, side, pixels, options);
   }

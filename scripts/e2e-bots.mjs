@@ -81,7 +81,15 @@ for (const size of Object.keys(SIZES)) {
   await local.goto(APP);
   await local.getByText("Pass & Play").click();
   await local.waitForURL(/\/local$/);
-  await playLine(local, ["e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "f8c5", "e1g1"]);
+  await playLine(local, ["e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "f8c5"]);
+  await clickMove(local, "e1", "g1");
+  // Sampled while the move is still animating: the king and the rook both slide.
+  const sliding = await local.locator(".board .piece[class*='animate-slide']").evaluateAll((pieces) => pieces.map((piece) => piece.className.split(" ")[1]).sort());
+  check(sliding.join(",") === "king,rook", `${tag} castling animates the king and the rook together`);
+  await clickMove(local, "g8", "f6");
+  const hopping = await local.locator(".board .piece.knight[class*='animate-hop']").count();
+  check(hopping === 1, `${tag} the knight hops`);
+  await local.getByRole("button", { name: "Undo" }).click();
   check((await sanList(local)).at(-1) === "O-O", `${tag} castling is written O-O`);
   check((await square(local, "f1").getAttribute("data-piece")) === "white-rook", `${tag} castling moves the rook to f1`);
   check((await square(local, "g1").getAttribute("data-piece")) === "white-king", `${tag} castling moves the king to g1`);
@@ -104,6 +112,13 @@ for (const size of Object.keys(SIZES)) {
   check((await local.locator('.board .check-square[data-square="e8"]').count()) === 1, `${tag} a king in check is highlighted`);
   check((await sanList(local)).at(-1) === "Qh5+", `${tag} check is written with +`);
   check((await local.locator(".board .movable-square").count()) === 1, `${tag} only the piece that can answer the check is movable`);
+  // A draw: both sides shuffle their knights until the position has occurred three times.
+  await local.getByRole("button", { name: "New game" }).click();
+  await local.getByRole("button", { name: "Start new game" }).click();
+  const shuffle = ["g1f3", "g8f6", "f3g1", "f6g8"];
+  await playLine(local, [...shuffle, ...shuffle]);
+  check((await local.locator(".modal-dialog h2").innerText()) === "Draw by repetition", `${tag} threefold repetition ends the game as a draw`);
+  await local.screenshot({ path: `${out}/e2e-${size}-draw.png` });
   await local.context().close();
 
   // ---- 3. Online: chat, promotion, resignation, rematch ----

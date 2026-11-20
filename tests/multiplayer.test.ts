@@ -187,6 +187,61 @@ describe("multiplayer game server", () => {
     expect(restarted.game.currentPlayer).toBe("white");
   });
 
+  it("plays a game to checkmate and rejects moves afterwards", async () => {
+    const whiteClient = await newClient();
+    const blackClient = await newClient();
+    const room = await createRoom(whiteClient, { name: "White", rules: {} });
+    await joinRoom(blackClient, { name: "Black", code: room.snapshot.code });
+
+    // Fool's mate.
+    const finishedState = waitForState(whiteClient, (state) => state.stage === "finished");
+    for (const [client, moveId] of [[whiteClient, "f2f3"], [blackClient, "e7e5"], [whiteClient, "g2g4"], [blackClient, "d8h4"]] as const) {
+      expect(await move(client, moveId)).toEqual({ ok: true, data: null });
+    }
+    const finished = await finishedState;
+    expect(finished.game.status).toMatchObject({ phase: "won", winner: "black", reason: "checkmate" });
+    expect(finished.game.moveLog.map((entry) => entry.notation)).toEqual(["f3", "e5", "g4", "Qh4#"]);
+    expect(await move(whiteClient, "e2e4")).toEqual({ ok: false, message: "That game is already over." });
+    expect(await resign(whiteClient)).toEqual({ ok: false, message: "That game is already over." });
+  });
+
+  it("rejects an illegal move without changing the game", async () => {
+    const whiteClient = await newClient();
+    const blackClient = await newClient();
+    const room = await createRoom(whiteClient, { name: "White", rules: {} });
+    const joined = await joinRoom(blackClient, { name: "Black", code: room.snapshot.code });
+
+    expect(await move(whiteClient, "e2e5")).toEqual({ ok: false, message: "That move is no longer legal." });
+    expect(await move(whiteClient, "e1g1")).toEqual({ ok: false, message: "That move is no longer legal." });
+    const updated = waitForState(blackClient, (state) => state.game.moveLog.length === 1);
+    expect(await move(whiteClient, "e2e4")).toEqual({ ok: true, data: null });
+    expect((await updated).revision).toBe(joined.snapshot.revision + 1);
+  });
+
+  it("finishes the room on a draw and allows a rematch", async () => {
+    const whiteClient = await newClient();
+    const blackClient = await newClient();
+    const room = await createRoom(whiteClient, { name: "White", rules: {} });
+    await joinRoom(blackClient, { name: "Black", code: room.snapshot.code });
+
+    // Both sides shuffle their knights until the start position has occurred three times.
+    const finishedState = waitForState(whiteClient, (state) => state.stage === "finished");
+    const shuffle = ["g1f3", "g8f6", "f3g1", "f6g8"];
+    for (const [index, moveId] of [...shuffle, ...shuffle].entries()) {
+      expect(await move(index % 2 === 0 ? whiteClient : blackClient, moveId)).toEqual({ ok: true, data: null });
+    }
+    const finished = await finishedState;
+    expect(finished.game.status).toMatchObject({ phase: "draw", reason: "threefold-repetition" });
+    expect(await move(whiteClient, "e2e4")).toEqual({ ok: false, message: "That game is already over." });
+
+    expect(await rematch(whiteClient)).toEqual({ ok: true, data: null });
+    const restartedState = waitForState(whiteClient, (state) => state.stage === "playing" && state.rematchVotes.length === 0);
+    expect(await rematch(blackClient)).toEqual({ ok: true, data: null });
+    const restarted = await restartedState;
+    expect(restarted.game.moveLog).toHaveLength(0);
+    expect(restarted.game.status.phase).toBe("playing");
+  });
+
   it("shows only generated names and keeps player IDs private", async () => {
     const whiteClient = await newClient();
     const blackClient = await newClient();

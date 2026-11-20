@@ -1,6 +1,6 @@
-# Knight Checkers Support
+# [GAME NAME] Support
 
-_Draft — publish this at the support URL used in the store listings._
+_Template. Replace the bracketed fields, then publish this at the support URL used in the store listings._
 
 **Contact:** [CONTACT EMAIL]. We usually reply within a few days.
 
@@ -16,4 +16,4 @@ If a player disconnects, their seat is held for 30 seconds. If they don't come b
 Choose Play Multiplayer, create a private room and send your friend the six-character room code. They choose Join room and enter it.
 
 **What are the rules?**
-Standard American checkers, plus one chess knight per side. The knight moves like a chess knight, is never forced to capture, and has to rest for one turn after it moves. Tap "How to play" on the home screen for the full rules.
+[ONE OR TWO SENTENCES ON THE RULES.] Tap "How to play" on the home screen for the full rules.

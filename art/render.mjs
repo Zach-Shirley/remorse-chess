@@ -55,7 +55,7 @@ for (const name of names) {
     await sharp(png).webp({ quality: 82 }).toFile(`src/assets/${name}.webp`);
   } else if (name === "piece-icon") {
     // Source for the app icon and splash screen (scripts/make-app-icon.mjs).
-    writeFileSync("art/piece-icon.png", await render("knight-black", 1024, { fit: 1.02 }));
+    writeFileSync("art/piece-icon.png", await render("bishop-white", 1024, { fit: 1.02 }));
   } else {
     const png = await render(name, 768);
     writeFileSync(`art/out/${name}.png`, png);

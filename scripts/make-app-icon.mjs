@@ -4,16 +4,22 @@
 import { mkdirSync } from "node:fs";
 import sharp from "sharp";
 
-const dark = "#476078";
-const light = "#d4c4a4";
-const night = "#0a0607";
+// The accent colours from src/theme/tokens.css.
+const dark = "#3f2a99";
+const glow = "#7054e0";
+const edge = "#17103d";
+const night = "#07060d";
 
-// A 2x2 board corner. Apple masks the corners itself, so no rounding here.
+// A violet pool of light, like a lit confessional. Apple masks the corners itself, so no rounding here.
 const board = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024">
-  <rect width="512" height="512" fill="${light}"/>
-  <rect x="512" width="512" height="512" fill="${dark}"/>
-  <rect y="512" width="512" height="512" fill="${dark}"/>
-  <rect x="512" y="512" width="512" height="512" fill="${light}"/>
+  <defs>
+    <radialGradient id="pool" cx="50%" cy="42%" r="70%">
+      <stop offset="0" stop-color="${glow}"/>
+      <stop offset="0.55" stop-color="${dark}"/>
+      <stop offset="1" stop-color="${edge}"/>
+    </radialGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#pool)"/>
 </svg>`);
 
 async function knightLayer(source, size) {
@@ -33,7 +39,7 @@ async function icon(source, output) {
       { input: shadow, left: left + 10, top: top + 22 },
       { input: knight, left, top }
     ])
-    .flatten({ background: light })
+    .flatten({ background: dark })
     .png()
     .toFile(output);
 }

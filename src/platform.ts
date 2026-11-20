@@ -5,7 +5,8 @@ import { StatusBar, Style } from "@capacitor/status-bar";
 export const isNativeApp = Capacitor.isNativePlatform();
 
 // Native builds have no Vercel env vars, so they need the production server baked in.
-export const PRODUCTION_GAME_SERVER_URL = "https://checkers-with-a-knight-server.onrender.com";
+// CHANGE-ME: each game sets the URL of its own deployed game server.
+export const PRODUCTION_GAME_SERVER_URL = "https://CHANGE-ME.example";
 
 // Every screen is dark, so the status bar always uses light text.
 export function applyStatusBarStyle() {

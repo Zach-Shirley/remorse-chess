@@ -457,6 +457,10 @@ img {
   margin-top: 14px;
 }
 
+.modal-dialog.modal-wide {
+  width: min(100%, 680px);
+}
+
 .modal-close {
   position: absolute;
   top: 16px;
@@ -545,6 +549,80 @@ img {
   line-height: 1.45;
 }
 
+/* The six pieces, two to a row where there is room. */
+.rules-list.piece-rules {
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.rules-list.piece-rules li {
+  align-items: start;
+  padding: 8px 12px 10px 4px;
+  gap: 6px;
+  grid-template-columns: 50px minmax(0, 1fr);
+}
+
+.rules-list.piece-rules img {
+  width: 50px;
+  height: 50px;
+  margin-top: -6px;
+}
+
+.rules-notes {
+  display: grid;
+  margin: 16px 0 0;
+  gap: 10px;
+}
+
+.rules-notes dt {
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.rules-notes dd {
+  margin: 2px 0 0;
+  color: var(--text-soft);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+/* Promotion picker: four large piece buttons. */
+.promotion-options {
+  display: grid;
+  margin-top: 18px;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.promotion-options button {
+  display: grid;
+  justify-items: center;
+  padding: 6px 4px 12px;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  color: var(--text-soft);
+  background: var(--glass);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: background 150ms, border-color 150ms, color 150ms, transform 150ms var(--ease-spring);
+}
+
+.promotion-options button:hover,
+.promotion-options button:focus-visible {
+  border-color: rgba(246, 183, 64, 0.6);
+  color: var(--text);
+  background: var(--amber-soft);
+  transform: translateY(-2px);
+}
+
+.promotion-options img {
+  width: min(100%, 84px);
+  aspect-ratio: 1;
+}
+
 .result-score {
   display: grid;
   margin-top: 18px;
@@ -561,6 +639,10 @@ img {
   border-radius: var(--r-lg);
   background: var(--glass);
   opacity: 0.7;
+}
+
+.result-side.drawn {
+  opacity: 1;
 }
 
 .result-side.winner {
@@ -661,6 +743,10 @@ img {
 
   .bot-levels button small {
     display: none;
+  }
+
+  .rules-list.piece-rules {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

@@ -1,6 +1,7 @@
 services:
   - type: web
-    name: checkers-with-a-knight-server
+    # CHANGE-ME: each game names its own Render service.
+    name: CHANGE-ME-game-server
     runtime: node
     plan: free
     buildCommand: npm ci
@@ -12,4 +13,5 @@ services:
         value: 0.0.0.0
       - key: CLIENT_ORIGINS
         # capacitor://localhost and https://localhost are the iOS and Android app shells.
-        value: https://knight-checkers.vercel.app,capacitor://localhost,https://localhost
+        # CHANGE-ME: replace the first origin with the game's web URL.
+        value: https://CHANGE-ME.example,capacitor://localhost,https://localhost

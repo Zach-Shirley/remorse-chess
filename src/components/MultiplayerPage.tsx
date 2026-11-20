@@ -6,6 +6,7 @@ import {
   ClipboardCheck,
   DoorOpen,
   Globe,
+  Handshake,
   Home,
   LoaderCircle,
   LogIn,
@@ -18,6 +19,7 @@ import {
   Zap
 } from "lucide-react";
 import {
+  DEFAULT_GAME_RULES,
   getLegalMoves,
   getPieceAt,
   opponentOf,
@@ -42,15 +44,17 @@ import { getMultiplayerSocket } from "../multiplayer/socket";
 import { type BotLevel } from "../bot";
 import { getPlayerIdentity } from "../playerIdentity";
 import { playSound, soundForMove } from "../sound";
-import { Board, groupMovesByPiece, moveAnimation } from "../ui/Board";
+import { Board, groupMovesByPiece, moveAnimation, movesTo } from "../ui/Board";
 import { BotLevelPicker } from "../ui/BotLevelPicker";
 import { ColorPicker, resolveColorChoice } from "../ui/ColorPicker";
 import { MoveList, PlayerBar, RulesDialog, SoundToggle, TurnStatus } from "../ui/GameChrome";
+import { resultTitle } from "../ui/GameOverDialog";
 import { Modal } from "../ui/Modal";
 import { pieceSprite, type PieceAnimation } from "../ui/PieceToken";
+import { PromotionPicker } from "../ui/PromotionPicker";
 import { LocalGamePage } from "./LocalGamePage";
 
-const SESSION_KEY = "knight-checkers:online-session:v1";
+const SESSION_KEY = "chess-base:online-session:v1";
 
 type LobbyMode = "create" | "join";
 type GameDialog = "rules" | "resign" | "leave" | null;
@@ -65,7 +69,7 @@ export function MultiplayerPage({
   const identity = useMemo(getPlayerIdentity, []);
   // While quick match searches, the player can play a bot; a found match replaces that game.
   const [waitingBot, setWaitingBot] = useState<{ level: BotLevel; rules: GameRules; botPlayer: Player; session: number } | null>(null);
-  const [queueRules, setQueueRules] = useState<GameRules>({ forceCheckerCaptures: true });
+  const [queueRules, setQueueRules] = useState<GameRules>(DEFAULT_GAME_RULES);
   const [matchNotice, setMatchNotice] = useState(false);
   const [snapshot, setSnapshot] = useState<RoomSnapshot | null>(null);
   const [session, setSession] = useState<PlayerSession | null>(() => readSession());
@@ -245,12 +249,6 @@ export function MultiplayerPage({
           busy={busy}
           error={error}
           onLeave={() => leaveRoom(true)}
-          onRuleChange={(rules) =>
-            runRoomRequest(
-              (ack) => socket.emit("room:update-rules", rules, ack),
-              () => undefined
-            )
-          }
         />
       );
     }
@@ -343,15 +341,16 @@ function MultiplayerLobby({
 }) {
   const [mode, setMode] = useState<LobbyMode>("create");
   const [code, setCode] = useState("");
-  const [forcedCaptures, setForcedCaptures] = useState(true);
+  // Plain chess has no rule options. A variant keeps its options in state here.
+  const rules = DEFAULT_GAME_RULES;
   const [botLevel, setBotLevel] = useState<BotLevel>("medium");
   const [roomColor, setRoomColor] = useState<ColorChoice>("random");
-  const [botColor, setBotColor] = useState<ColorChoice>("red");
+  const [botColor, setBotColor] = useState<ColorChoice>("white");
 
   function submit(event: FormEvent) {
     event.preventDefault();
     if (mode === "create") {
-      onCreate({ forceCheckerCaptures: forcedCaptures }, roomColor);
+      onCreate(rules, roomColor);
     } else {
       onJoin(code);
     }
@@ -362,11 +361,11 @@ function MultiplayerLobby({
       <main className="multiplayer-page">
         <section className="queue-screen" aria-live="polite">
           <div className="radar" aria-hidden="true">
-            <img src={pieceSprite("red", "knight")} alt="" draggable="false" />
+            <img src={pieceSprite("white", "knight")} alt="" draggable="false" />
           </div>
           <p className="section-kicker">Quick match</p>
           <h1>Looking for a player</h1>
-          <p>You will be matched with the next player who searches with the same capture rule.</p>
+          <p>You will be matched with the next player who searches.</p>
           <div className="queue-bot">
             <strong>Play a bot meanwhile?</strong>
             <BotLevelPicker value={botLevel} onChange={setBotLevel} />
@@ -412,19 +411,6 @@ function MultiplayerLobby({
         <p className="playing-as">
           Playing as <strong>{ownName}</strong>
         </p>
-
-        <label className="setting-toggle compact-toggle">
-          <span>
-            <strong>Force checker captures</strong>
-            <small>Checkers must jump when able. Applies to rooms you create and to quick match.</small>
-          </span>
-          <input
-            type="checkbox"
-            checked={forcedCaptures}
-            onChange={(event) => setForcedCaptures(event.currentTarget.checked)}
-          />
-          <span className="toggle-track" aria-hidden="true" />
-        </label>
 
         {error ? <p className="lobby-error" role="alert">{error}</p> : null}
 
@@ -486,12 +472,12 @@ function MultiplayerLobby({
               <Zap aria-hidden="true" size={18} />
               <h2>Quick match</h2>
             </div>
-            <p>Pair with the next player who searches. Colors are random, and you can play a bot while you wait.</p>
+            <p>Pair with the next player who searches. Sides are random, and you can play a bot while you wait.</p>
             <button
               className="button secondary"
               type="button"
               disabled={busy || !connected}
-              onClick={() => onQueue({ forceCheckerCaptures: forcedCaptures })}
+              onClick={() => onQueue(rules)}
             >
               Find match
             </button>
@@ -508,8 +494,7 @@ function WaitingRoom({
   connected,
   busy,
   error,
-  onLeave,
-  onRuleChange
+  onLeave
 }: {
   snapshot: RoomSnapshot;
   session: PlayerSession;
@@ -517,10 +502,9 @@ function WaitingRoom({
   busy: boolean;
   error: string | null;
   onLeave: () => void;
-  onRuleChange: (rules: GameRules) => void;
 }) {
   const [copied, setCopied] = useState(false);
-  const isHost = snapshot.players[session.player]?.isHost ?? false;
+  const ownSide = playerName(session.player);
 
   async function copyCode() {
     // The clipboard API only exists on secure (https) pages.
@@ -543,7 +527,7 @@ function WaitingRoom({
       <section className="waiting-room" aria-labelledby="waiting-title">
         <p className="section-kicker">Private room</p>
         <h1 id="waiting-title">Waiting for an opponent</h1>
-        <p className="waiting-copy">Share this code with your opponent. They choose Join room and enter it.</p>
+        <p className="waiting-copy">Share this code with your opponent. They choose Join room and enter it. You play {ownSide}.</p>
 
         <button className="room-code-display" type="button" onClick={copyCode} title="Copy room code">
           <span>{snapshot.code}</span>
@@ -554,24 +538,10 @@ function WaitingRoom({
         </button>
 
         <div className="waiting-seats">
-          <WaitingSeat player="red" name={snapshot.players.red?.name} connected={Boolean(snapshot.players.red?.connected)} />
+          <WaitingSeat player="white" name={snapshot.players.white?.name} connected={Boolean(snapshot.players.white?.connected)} />
           <span aria-hidden="true">vs</span>
           <WaitingSeat player="black" name={snapshot.players.black?.name} connected={Boolean(snapshot.players.black?.connected)} />
         </div>
-
-        <label className={`setting-toggle compact-toggle ${!isHost ? "disabled" : ""}`}>
-          <span>
-            <strong>Force checker captures</strong>
-            <small>{isHost ? "You can change this until another player joins." : "Set by the room host."}</small>
-          </span>
-          <input
-            type="checkbox"
-            checked={snapshot.rules.forceCheckerCaptures}
-            disabled={!isHost || !connected || busy}
-            onChange={(event) => onRuleChange({ forceCheckerCaptures: event.currentTarget.checked })}
-          />
-          <span className="toggle-track" aria-hidden="true" />
-        </label>
 
         {!connected ? <p className="lobby-error" role="alert">Reconnecting to multiplayer server...</p> : null}
         {error ? <p className="lobby-error" role="alert">{error}</p> : null}
@@ -583,7 +553,7 @@ function WaitingRoom({
 function WaitingSeat({ player, name, connected }: { player: Player; name: string | undefined; connected: boolean }) {
   return (
     <div className={`waiting-seat ${connected ? "occupied" : ""}`}>
-      <img src={pieceSprite(player, "man")} alt="" draggable="false" />
+      <img src={pieceSprite(player, "king")} alt="" draggable="false" />
       <small>{playerName(player)}</small>
       <strong>{name ?? "Open seat"}</strong>
     </div>
@@ -609,6 +579,8 @@ function OnlineGame({
   const [pieceAnimation, setPieceAnimation] = useState<PieceAnimation | null>(null);
   const [displayState, setDisplayState] = useState(snapshot.game);
   const [dialog, setDialog] = useState<GameDialog>(null);
+  // The promotion moves waiting for the player to pick a piece.
+  const [promotion, setPromotion] = useState<Move[] | null>(null);
   const latestStateRef = useRef(snapshot.game);
   const animationIdRef = useRef<number | null>(null);
   const animationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -622,18 +594,18 @@ function OnlineGame({
   const selectedMoves = selectedPieceId ? movesByPiece.get(selectedPieceId) ?? [] : [];
   const opponent = opponentOf(session.player);
   const opponentConnected = snapshot.players[opponent]?.connected ?? false;
-  const hasForcedCheckerCapture =
-    state.rules.forceCheckerCaptures &&
-    legalMoves.some((move) => move.pieceKind !== "knight" && move.captures.length > 0);
+  const playing = state.status.phase === "playing";
+  const phase = state.status.phase;
   const winner = state.status.phase === "won" ? state.status.winner : null;
 
   useEffect(() => {
-    if (state.forcedPieceId && state.currentPlayer === session.player) {
-      setSelectedPieceId(state.forcedPieceId);
-    } else if (selectedPieceId && !movesByPiece.has(selectedPieceId)) {
-      setSelectedPieceId(null);
-    }
-  }, [movesByPiece, selectedPieceId, session.player, state.currentPlayer, state.forcedPieceId]);
+    if (selectedPieceId && !movesByPiece.has(selectedPieceId)) setSelectedPieceId(null);
+  }, [movesByPiece, selectedPieceId]);
+
+  // A promotion choice is void once it is no longer this player's move.
+  useEffect(() => {
+    if (legalMoves.length === 0) setPromotion(null);
+  }, [legalMoves]);
 
   const finishPieceAnimation = useCallback((animationId: number) => {
     if (animationIdRef.current !== animationId) return;
@@ -654,10 +626,12 @@ function OnlineGame({
       const entry = state.moveLog[state.moveLog.length - 1];
       const movingPiece = getPieceAt(displayState, entry.from);
       if (movingPiece) {
-        const animation = moveAnimation(
-          { from: entry.from, to: entry.to, pieceKind: entry.pieceKind, capture: entry.captured.length > 0 },
-          { id: snapshot.revision, pieceId: movingPiece.id, perspective: session.player, direction: "to" }
-        );
+        const animation = moveAnimation(entry, {
+          id: snapshot.revision,
+          pieceId: movingPiece.id,
+          perspective: session.player,
+          direction: "to"
+        });
         animationIdRef.current = animation.id;
         setPieceAnimation(animation);
         playSound(soundForMove(entry));
@@ -677,8 +651,9 @@ function OnlineGame({
   }, []);
 
   useEffect(() => {
-    if (winner) playSound(winner === session.player ? "win" : "lose");
-  }, [winner, session.player]);
+    if (phase === "draw") playSound("draw");
+    if (phase === "won") playSound(winner === session.player ? "win" : "lose");
+  }, [phase, winner, session.player]);
 
   function request(
     action: (ack: (response: ServerResponse<null>) => void) => void,
@@ -700,36 +675,34 @@ function OnlineGame({
   }
 
   function playMove(move: Move) {
+    setPromotion(null);
+    setSelectedPieceId(null);
     request((ack) => socket.emit("room:move", move.id, ack));
   }
 
   function handleSquareClick(square: Square) {
-    if (pieceAnimation || !connected || !opponentConnected || state.status.phase === "won" || state.currentPlayer !== session.player) return;
+    if (pieceAnimation || !connected || !opponentConnected || !playing || state.currentPlayer !== session.player) return;
 
-    const destinationMove = selectedMoves.find(
-      (move) => move.to.row === square.row && move.to.col === square.col
-    );
-    if (destinationMove) {
-      playMove(destinationMove);
+    const destinationMoves = movesTo(selectedMoves, square);
+    if (destinationMoves.length > 1) {
+      setPromotion(destinationMoves);
+      return;
+    }
+    if (destinationMoves.length === 1) {
+      playMove(destinationMoves[0]);
       return;
     }
 
     const piece = getPieceAt(displayState, square);
     if (piece?.player === session.player && movesByPiece.has(piece.id)) {
-      setSelectedPieceId(piece.id);
+      setSelectedPieceId(piece.id === selectedPieceId ? null : piece.id);
       return;
     }
 
-    if (!state.forcedPieceId) setSelectedPieceId(null);
+    setSelectedPieceId(null);
   }
 
-  const statusMessage = getOnlineStatusMessage(
-    state,
-    session.player,
-    connected,
-    opponentConnected,
-    hasForcedCheckerCapture
-  );
+  const statusMessage = getOnlineStatusMessage(state, session.player, connected, opponentConnected);
   const ownRematchVote = snapshot.rematchVotes.includes(session.player);
   const opponentRematchVote = snapshot.rematchVotes.includes(opponent);
   const opponentName = snapshot.players[opponent]?.name ?? playerName(opponent);
@@ -740,21 +713,21 @@ function OnlineGame({
 
   return (
     <main className="game-page online-game-page">
-      <section className="game-workspace" aria-label="Online Knight Checkers game">
+      <section className="game-workspace" aria-label="Online chess game">
         <div className="board-column">
           <PlayerBar
             player={opponent}
             name={snapshot.players[opponent]?.name ?? "Open seat"}
             tag={playerName(opponent)}
             state={state}
-            active={state.status.phase === "playing" && state.currentPlayer === opponent}
+            active={playing && state.currentPlayer === opponent}
             offline={!opponentConnected}
           />
 
           <Board
             state={displayState}
             perspective={session.player}
-            label={`Knight Checkers board, ${playerName(session.player)} side`}
+            label={`Chess board, ${playerName(session.player)} side`}
             selectedPieceId={selectedPieceId}
             targets={selectedMoves}
             movablePieceIds={movesByPiece}
@@ -768,7 +741,7 @@ function OnlineGame({
             name={snapshot.players[session.player]?.name ?? "You"}
             tag={`You · ${playerName(session.player)}`}
             state={state}
-            active={state.status.phase === "playing" && state.currentPlayer === session.player}
+            active={playing && state.currentPlayer === session.player}
             offline={!connected}
           />
 
@@ -798,13 +771,8 @@ function OnlineGame({
 
           <TurnStatus
             state={state}
-            title={state.status.phase === "won" ? "Game over" : state.currentPlayer === session.player ? "Your move" : `${opponentName} to move`}
+            title={!playing ? "Game over" : state.currentPlayer === session.player ? "Your move" : `${opponentName} to move`}
             message={statusMessage}
-            action={
-              state.canEndJump && state.currentPlayer === session.player ? (
-                <button className="text-button" type="button" onClick={() => request((ack) => socket.emit("room:end-jump", ack))}>End turn</button>
-              ) : null
-            }
           />
 
           <MoveList state={state} />
@@ -823,7 +791,7 @@ function OnlineGame({
               className="danger-action"
               type="button"
               onClick={() => setDialog("resign")}
-              disabled={state.status.phase === "won" || !connected}
+              disabled={!playing || !connected}
               title="Resign game"
             >
               <DoorOpen aria-hidden="true" size={19} />
@@ -833,7 +801,7 @@ function OnlineGame({
               className={opponentRematchVote ? "rematch-action requested" : "rematch-action"}
               type="button"
               onClick={requestRematch}
-              disabled={state.status.phase !== "won" || ownRematchVote || !connected || !opponentConnected}
+              disabled={playing || ownRematchVote || !connected || !opponentConnected}
               title="Request a rematch"
             >
               <RotateCcw aria-hidden="true" size={19} />
@@ -851,6 +819,10 @@ function OnlineGame({
 
       {dialog === "rules" ? <RulesDialog onClose={() => setDialog(null)} /> : null}
 
+      {promotion && dialog === null ? (
+        <PromotionPicker moves={promotion} onPick={playMove} onCancel={() => setPromotion(null)} />
+      ) : null}
+
       {dialog === "resign" ? (
         <Modal title="Resign this game?" description="Your opponent will win the current match." tone="danger" onClose={() => setDialog(null)}>
           <div className="modal-actions">
@@ -861,7 +833,7 @@ function OnlineGame({
       ) : null}
 
       {dialog === "leave" ? (
-        <Modal title="Leave this room?" description={state.status.phase === "playing" ? "Leaving an active match counts as a resignation." : "You will return to the home screen."} tone="danger" onClose={() => setDialog(null)}>
+        <Modal title="Leave this room?" description={playing ? "Leaving an active match counts as a resignation." : "You will return to the home screen."} tone="danger" onClose={() => setDialog(null)}>
           <div className="modal-actions">
             <button className="button secondary" type="button" onClick={() => setDialog(null)}>Stay</button>
             <button className="button danger" type="button" data-autofocus onClick={onLeave}>Leave room</button>
@@ -894,7 +866,7 @@ function GameEventOverlay({
   const disconnectSeconds = useCountdownSeconds(snapshot.disconnectDeadlines[opponent]);
   // "View board" hides the result card; a rematch (a new game) brings it back next time.
   const [resultHidden, setResultHidden] = useState(false);
-  const isOver = state.status.phase === "won";
+  const isOver = state.status.phase !== "playing";
   useEffect(() => {
     if (!isOver) setResultHidden(false);
   }, [isOver]);
@@ -921,27 +893,31 @@ function GameEventOverlay({
     );
   }
 
-  if (state.status.phase !== "won" || resultHidden) {
+  if (state.status.phase === "playing" || resultHidden) {
     return null;
   }
 
-  const didWin = state.status.winner === session.player;
-  const opponentLeft = didWin && state.status.reason === "resignation" && !opponentConnected;
-  const resultLabel = didWin ? "Victory" : "Defeat";
-  const resultTitle = opponentLeft
-    ? `${opponentName} left the match`
-    : state.status.reason === "resignation"
-      ? didWin
-        ? `${opponentName} resigned`
-        : "You resigned"
-      : didWin
-        ? "You won"
-        : `${opponentName} won`;
+  const drawn = state.status.phase === "draw";
+  const didWin = state.status.phase === "won" && state.status.winner === session.player;
+  const resigned = state.status.phase === "won" && state.status.reason === "resignation";
+  const opponentLeft = didWin && resigned && !opponentConnected;
+  const resultLabel = drawn ? "Draw" : didWin ? "Victory" : "Defeat";
+  const outcomeTitle = drawn
+    ? resultTitle(state, session.player)
+    : opponentLeft
+      ? `${opponentName} left the match`
+      : resigned
+        ? didWin
+          ? `${opponentName} resigned`
+          : "You resigned"
+        : didWin
+          ? "You won"
+          : `${opponentName} won`;
   const title = ownRematchVote
     ? "Rematch requested"
     : opponentRematchVote
       ? `${opponentName} wants a rematch`
-      : resultTitle;
+      : outcomeTitle;
   const description = ownRematchVote
     ? `Waiting for ${opponentName} to accept.`
     : opponentRematchVote
@@ -950,8 +926,8 @@ function GameEventOverlay({
 
   return (
     <div className="game-event-layer" role="status" aria-live="assertive">
-      <section className={`game-event-card result-event ${didWin ? "won" : "lost"}`}>
-        <span className="game-event-icon" aria-hidden="true"><Trophy size={28} /></span>
+      <section className={`game-event-card result-event ${drawn ? "drawn" : didWin ? "won" : "lost"}`}>
+        <span className="game-event-icon" aria-hidden="true">{drawn ? <Handshake size={28} /> : <Trophy size={28} />}</span>
         <p className="section-kicker">{resultLabel}</p>
         <h2>{title}</h2>
         <p>{description}</p>
@@ -1053,20 +1029,12 @@ function ConnectionScreen({ label }: { label: string }) {
   );
 }
 
-function getOnlineStatusMessage(
-  state: GameState,
-  player: Player,
-  connected: boolean,
-  opponentConnected: boolean,
-  hasForcedCheckerCapture: boolean
-) {
+function getOnlineStatusMessage(state: GameState, player: Player, connected: boolean, opponentConnected: boolean) {
   if (!connected) return "Reconnecting to the game server...";
   if (!opponentConnected) return "Waiting for your opponent to reconnect.";
-  if (state.status.phase === "won") return state.status.message;
-  if (state.currentPlayer !== player) return "Waiting for your opponent.";
-  if (state.forcedPieceId && state.canEndJump) return "Continue jumping or end the turn.";
-  if (state.forcedPieceId) return "A checker must finish its jump.";
-  if (hasForcedCheckerCapture) return "A checker capture is available.";
+  if (state.status.phase !== "playing") return state.status.message;
+  if (state.currentPlayer !== player) return state.status.check ? "Check! Waiting for your opponent." : "Waiting for your opponent.";
+  if (state.status.check) return "You are in check. Get your king to safety.";
   return "Select a piece to make a move.";
 }
 

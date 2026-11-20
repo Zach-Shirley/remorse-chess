@@ -1,5 +1,5 @@
 // Renders the source images @capacitor/assets turns into every iOS/Android icon and splash size.
-// The knight comes from art/piece-icon.png, a 1024px render from art/studio.js.
+// The piece comes from art/piece-icon.png, a 1024px render from art/studio.js.
 // Run: npm run mobile:icons
 import { mkdirSync } from "node:fs";
 import sharp from "sharp";

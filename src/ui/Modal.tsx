@@ -7,9 +7,11 @@ type ModalProps = {
   onClose: () => void;
   children: ReactNode;
   tone?: "default" | "danger" | "victory" | "defeat";
+  // A wider dialog for content that would be a long scroll at the normal width.
+  wide?: boolean;
 };
 
-export function Modal({ title, description, onClose, children, tone = "default" }: ModalProps) {
+export function Modal({ title, description, onClose, children, tone = "default", wide = false }: ModalProps) {
   const titleId = useId();
   const descriptionId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -39,7 +41,7 @@ export function Modal({ title, description, onClose, children, tone = "default" 
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
       <div
-        className={`modal-dialog tone-${tone}`}
+        className={`modal-dialog tone-${tone}${wide ? " modal-wide" : ""}`}
         ref={dialogRef}
         role="dialog"
         aria-modal="true"

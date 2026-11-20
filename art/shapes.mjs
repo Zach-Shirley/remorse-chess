@@ -1,4 +1,4 @@
-// Original Knight Checkers piece outlines.
+// The knight's outline. The other five pieces are turned on a lathe in studio.js and need no outline.
 // Coordinates: 100x100 box, y grows downward (SVG convention), knight faces left.
 
 // Horse head and neck, drawn as one closed outline. The base (pedestal) is separate.
@@ -31,7 +31,3 @@ export const KNIGHT_BACK = [
   [[42, 11], [52, 11], [64, 18], [71, 31]],
   [[71, 31], [78, 45], [80, 64], [78, 80]]
 ];
-
-// Crown emblem inlaid on kings, seen from above. 100x100 box, points up.
-export const CROWN =
-  "M 15 80 L 7 34 Q 6 27 11 31 L 30 48 L 46 17 Q 50 10 54 17 L 70 48 L 89 31 Q 94 27 93 34 L 85 80 Q 50 87 15 80 Z";

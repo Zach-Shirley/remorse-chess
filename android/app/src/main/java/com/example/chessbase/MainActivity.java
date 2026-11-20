@@ -1,4 +1,4 @@
-package com.example.knightcheckers;
+package com.example.chessbase;
 
 import com.getcapacitor.BridgeActivity;
 

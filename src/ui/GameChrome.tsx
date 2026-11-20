@@ -1,8 +1,8 @@
 // The parts around the board that every game mode shares: player bars, turn status,
 // the move list, the rules dialog and the sound toggle.
 import { useEffect, useRef, type ReactNode } from "react";
-import { Bot, Crown, Volume2, VolumeX } from "lucide-react";
-import { squareName, type GameState, type MoveLogEntry, type Player } from "../game";
+import { Bot, Volume2, VolumeX } from "lucide-react";
+import { type GameState, type MoveLogEntry, type PieceKind, type Player } from "../game";
 import { setMuted, useMuted } from "../sound";
 import { MaterialStrip } from "./MaterialStrip";
 import { Modal } from "./Modal";
@@ -19,7 +19,7 @@ export function PlayerBar({
 }: {
   player: Player;
   name: string;
-  // Short role line under the name, e.g. "You · Red".
+  // Short role line under the name, e.g. "You · White".
   tag: string;
   state: GameState;
   active: boolean;
@@ -29,7 +29,7 @@ export function PlayerBar({
   return (
     <div className={`player-bar ${player} ${active ? "active" : ""} ${offline ? "disconnected" : ""}`}>
       <span className="player-avatar" aria-hidden="true">
-        <img src={pieceSprite(player, "man")} alt="" draggable="false" />
+        <img src={pieceSprite(player, "king")} alt="" draggable="false" />
         {isBot ? (
           <span className="avatar-badge">
             <Bot size={12} strokeWidth={2.4} />
@@ -60,10 +60,13 @@ export function TurnStatus({
   message: string;
   action?: ReactNode;
 }) {
-  const over = state.status.phase === "won";
+  const { status } = state;
+  const over = status.phase !== "playing";
+  const check = status.phase === "playing" && status.check;
+  const color = status.phase === "won" ? status.winner : status.phase === "draw" ? "draw" : state.currentPlayer;
   return (
-    <section className={`turn-status ${over ? "game-over" : ""}`} aria-live="polite">
-      <span className={`status-color ${state.status.phase === "won" ? state.status.winner : state.currentPlayer}`} />
+    <section className={`turn-status ${over ? "game-over" : ""} ${check ? "in-check" : ""}`} aria-live="polite">
+      <span className={`status-color ${color}`} />
       <div>
         <p>{title}</p>
         <span>{message}</span>
@@ -73,12 +76,24 @@ export function TurnStatus({
   );
 }
 
-function shortNotation(entry: MoveLogEntry) {
-  return `${squareName(entry.from)}${entry.captured.length > 0 ? "×" : "–"}${squareName(entry.to)}`;
+// The move log as numbered pairs: "1. e4 e5". A game that starts with Black to move (from a
+// FEN) gets "..." in White's place.
+function movePairs(moveLog: MoveLogEntry[]) {
+  const pairs: { turn: number; white?: MoveLogEntry; black?: MoveLogEntry }[] = [];
+  for (const entry of moveLog) {
+    let pair = pairs[pairs.length - 1];
+    if (!pair || pair.turn !== entry.turn) {
+      pair = { turn: entry.turn };
+      pairs.push(pair);
+    }
+    pair[entry.player] = entry;
+  }
+  return pairs;
 }
 
 export function MoveList({ state }: { state: GameState }) {
   const listRef = useRef<HTMLOListElement | null>(null);
+  const latest = state.moveLog[state.moveLog.length - 1];
 
   useEffect(() => {
     const list = listRef.current;
@@ -98,12 +113,13 @@ export function MoveList({ state }: { state: GameState }) {
         {state.moveLog.length === 0 ? (
           <li className="empty-moves">No moves yet.</li>
         ) : (
-          state.moveLog.map((entry, index) => (
-            <li className={entry.player} key={index} title={entry.notation}>
-              <span className="move-number">{index + 1}</span>
-              <img src={pieceSprite(entry.player, entry.pieceKind)} alt="" draggable="false" />
-              <span className="move-notation">{shortNotation(entry)}</span>
-              {entry.notation.includes("crown") ? <Crown className="move-crown" aria-label="crowned" size={12} /> : null}
+          movePairs(state.moveLog).map((pair) => (
+            <li key={pair.turn}>
+              <span className="move-number">{pair.turn}.</span>
+              <span className={`move-san white ${pair.white === latest ? "latest" : ""}`}>{pair.white?.notation ?? "..."}</span>
+              {pair.black ? (
+                <span className={`move-san black ${pair.black === latest ? "latest" : ""}`}>{pair.black.notation}</span>
+              ) : null}
             </li>
           ))
         )}
@@ -127,36 +143,46 @@ export function SoundToggle() {
   );
 }
 
-const RULES: { sprite: string; title: string; text: string }[] = [
+// The rules dialog's copy. A variant edits these two lists.
+const PIECE_RULES: { kind: PieceKind; title: string; text: string }[] = [
+  { kind: "king", title: "King", text: "One square in any direction. It may never move into check." },
+  { kind: "queen", title: "Queen", text: "Any distance in a straight line: along ranks, files or diagonals." },
+  { kind: "rook", title: "Rook", text: "Any distance along ranks and files." },
+  { kind: "bishop", title: "Bishop", text: "Any distance along diagonals." },
+  { kind: "knight", title: "Knight", text: "An L: two squares one way, one to the side. It jumps over pieces." },
+  { kind: "pawn", title: "Pawn", text: "One square forward (two from its start). Captures one square diagonally." }
+];
+
+const RULE_NOTES: { title: string; text: string }[] = [
   {
-    sprite: pieceSprite("red", "man"),
-    title: "Checkers",
-    text: "Move diagonally forward, jump enemy pieces to capture them, and chain jumps when you can."
+    title: "Check and checkmate",
+    text: "A king under attack is in check and must escape at once. If it cannot, that is checkmate and the game is over."
   },
   {
-    sprite: pieceSprite("red", "king"),
-    title: "Kings",
-    text: "A checker that reaches the far row is crowned and can move and jump backward too."
+    title: "Castling",
+    text: "Once per game the king moves two squares toward a rook and the rook jumps over it. Neither may have moved, the squares between must be empty, and the king may not castle out of, through or into check."
   },
   {
-    sprite: pieceSprite("red", "knight"),
-    title: "The knight",
-    text: "Moves and captures in an L like a chess knight, on any square. It is never forced to capture."
+    title: "En passant",
+    text: "A pawn that advances two squares and lands beside an enemy pawn can be captured by it as if it had moved one, but only on the very next move."
   },
   {
-    sprite: pieceSprite("red", "knight", true),
-    title: "Resting",
-    text: "After the knight moves it rests for your next turn, so that turn must be a checker move."
+    title: "Promotion",
+    text: "A pawn that reaches the far rank becomes a queen, rook, bishop or knight of your choice."
+  },
+  {
+    title: "Draws",
+    text: "Stalemate (no legal move while not in check), the same position three times, fifty moves by each side with no capture or pawn move, or too little material left to checkmate."
   }
 ];
 
 export function RulesDialog({ onClose }: { onClose: () => void }) {
   return (
-    <Modal title="How to play" description="Classic checkers, plus one knight per side. Red moves first." onClose={onClose}>
-      <ul className="rules-list">
-        {RULES.map((rule) => (
-          <li key={rule.title}>
-            <img src={rule.sprite} alt="" draggable="false" />
+    <Modal title="How to play" description="Checkmate the enemy king. White moves first." onClose={onClose} wide>
+      <ul className="rules-list piece-rules">
+        {PIECE_RULES.map((rule) => (
+          <li key={rule.kind}>
+            <img src={pieceSprite("white", rule.kind)} alt="" draggable="false" />
             <div>
               <strong>{rule.title}</strong>
               <p>{rule.text}</p>
@@ -164,11 +190,16 @@ export function RulesDialog({ onClose }: { onClose: () => void }) {
           </li>
         ))}
       </ul>
-      <p className="rules-copy">
-        Win by taking every enemy checker (their knight may survive) or by leaving them with no legal move.
-      </p>
+      <dl className="rules-notes">
+        {RULE_NOTES.map((note) => (
+          <div key={note.title}>
+            <dt>{note.title}</dt>
+            <dd>{note.text}</dd>
+          </div>
+        ))}
+      </dl>
       <div className="modal-actions single-action">
-        <button className="button primary" type="button" data-autofocus onClick={onClose}>
+        <button className="button primary" type="button" onClick={onClose}>
           Got it
         </button>
       </div>

@@ -11,7 +11,7 @@ export type MultiplayerSocket = Socket<
 // production and preview links, a phone on the LAN without an override) uses production.
 const isLocalHost = ["localhost", "127.0.0.1"].includes(window.location.hostname) || window.location.hostname.endsWith(".sslip.io");
 const gameServerUrl =
-  import.meta.env.VITE_GAME_SERVER_URL ?? (isLocalHost ? "http://127.0.0.1:4175" : PRODUCTION_GAME_SERVER_URL);
+  import.meta.env.VITE_GAME_SERVER_URL ?? (isLocalHost ? "http://127.0.0.1:4275" : PRODUCTION_GAME_SERVER_URL);
 
 let socket: MultiplayerSocket | null = null;
 

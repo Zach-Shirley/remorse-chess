@@ -4,7 +4,7 @@ import { LocalGamePage } from "./components/LocalGamePage";
 import { MultiplayerPage } from "./components/MultiplayerPage";
 import type { BotLevel } from "./bot";
 import { resolveColorChoice } from "./ui/ColorPicker";
-import { opponentOf, type GameRules, type Player } from "./game";
+import { DEFAULT_GAME_RULES, opponentOf, type GameRules, type Player } from "./game";
 import type { ColorChoice } from "./multiplayer/protocol";
 
 type AppRoute = "/" | "/local" | "/bot" | "/multiplayer";
@@ -21,7 +21,7 @@ function getRoute(): AppRoute {
 
 export function App() {
   const [route, setRoute] = useState<AppRoute>(getRoute);
-  const [localRules, setLocalRules] = useState<GameRules>({ forceCheckerCaptures: true });
+  const [localRules, setLocalRules] = useState<GameRules>(DEFAULT_GAME_RULES);
   const [localSession, setLocalSession] = useState(0);
   const [botLevel, setBotLevel] = useState<BotLevel>("medium");
   const [botPlayer, setBotPlayer] = useState<Player>("black");

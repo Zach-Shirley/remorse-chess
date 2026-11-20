@@ -1,15 +1,15 @@
 {
-  "name": "knight-checkers",
+  "name": "remorse-chess",
   "private": true,
   "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "dev:local": "vite --host 127.0.0.1 --port 4174 --strictPort",
+    "dev:local": "vite --host 127.0.0.1 --port 4274 --strictPort",
     "dev:multiplayer": "concurrently --kill-others --names SERVER,WEB --prefix-colors magenta,cyan \"npm:server:dev\" \"npm:dev:local\"",
     "server:dev": "tsx watch server/game-server.ts",
     "server:start": "tsx server/game-server.ts",
-    "preview:local": "vite preview --host 127.0.0.1 --port 4174 --strictPort",
+    "preview:local": "vite preview --host 127.0.0.1 --port 4274 --strictPort",
     "build": "tsc && vite build",
     "art": "node art/board.mjs && node art/render.mjs",
     "test": "vitest run",

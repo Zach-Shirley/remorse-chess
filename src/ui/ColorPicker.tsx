@@ -4,17 +4,17 @@ import type { ColorChoice } from "../multiplayer/protocol";
 import { pieceSprite } from "./PieceToken";
 
 const OPTIONS: { value: ColorChoice; label: string }[] = [
-  { value: "red", label: "Red" },
+  { value: "white", label: "White" },
   { value: "black", label: "Black" },
   { value: "random", label: "Random" }
 ];
 
-// Red always moves first, whichever side the player picks.
+// White always moves first, whichever side the player picks.
 export function ColorPicker({ value, onChange }: { value: ColorChoice; onChange: (choice: ColorChoice) => void }) {
   return (
     <div className="color-picker">
-      <span className="field-caption">Your color · Red moves first</span>
-      <div className="segmented" role="radiogroup" aria-label="Your color">
+      <span className="field-caption">Your side · White moves first</span>
+      <div className="segmented" role="radiogroup" aria-label="Your side">
         {OPTIONS.map((option) => (
           <button
             key={option.value}
@@ -27,7 +27,7 @@ export function ColorPicker({ value, onChange }: { value: ColorChoice; onChange:
             {option.value === "random" ? (
               <Shuffle aria-hidden="true" size={16} />
             ) : (
-              <img src={pieceSprite(option.value, "man")} alt="" draggable="false" />
+              <img src={pieceSprite(option.value, "king")} alt="" draggable="false" />
             )}
             {option.label}
           </button>
@@ -38,6 +38,6 @@ export function ColorPicker({ value, onChange }: { value: ColorChoice; onChange:
 }
 
 export function resolveColorChoice(choice: ColorChoice): Player {
-  if (choice === "random") return Math.random() < 0.5 ? "red" : "black";
+  if (choice === "random") return Math.random() < 0.5 ? "white" : "black";
   return choice;
 }

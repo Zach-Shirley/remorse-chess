@@ -1,7 +1,7 @@
 {
-  "name": "Knight Checkers",
-  "short_name": "Knight Checkers",
-  "description": "Classic checkers with one elusive chess knight per side.",
+  "name": "Chess",
+  "short_name": "Chess",
+  "description": "Play a bot, a friend on one screen, or an opponent online.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",

@@ -33,8 +33,11 @@
   --board-dark: #476078;
   --board-frame-top: #24121a;
   --board-frame-bottom: #0d0709;
-  --side-red: #d3202f;
+  --side-white: #efe3cb;
   --side-black: #25262c;
+  /* Check: the king's square glows in this colour. */
+  --check: #ff3d4d;
+  --check-glow: rgba(255, 61, 77, 0.6);
 
   /* Shape */
   --r-xs: 8px;

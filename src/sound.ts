@@ -1,9 +1,9 @@
 // Small synthesized sound effects (no audio files). Muted state is remembered per device.
 import { useSyncExternalStore } from "react";
 
-export type SoundName = "move" | "capture" | "crown" | "win" | "lose";
+export type SoundName = "move" | "capture" | "check" | "promote" | "win" | "lose" | "draw";
 
-const STORAGE_KEY = "knight-checkers:muted";
+const STORAGE_KEY = "chess-base:muted";
 let muted = readMuted();
 let context: AudioContext | null = null;
 const listeners = new Set<() => void>();
@@ -103,13 +103,20 @@ export function playSound(name: SoundName) {
     tock(ctx, now, 150, 0.26);
     tock(ctx, now + 0.085, 230, 0.2);
   }
-  if (name === "crown") [523, 784].forEach((f, i) => note(ctx, now + i * 0.09, f, 0.35, 0.07));
+  if (name === "check") {
+    // The move's tock, then two quick rising notes: unmistakably "watch your king".
+    tock(ctx, now, 190, 0.22);
+    [740, 988].forEach((f, i) => note(ctx, now + 0.07 + i * 0.075, f, 0.22, 0.06));
+  }
+  if (name === "promote") [523, 784].forEach((f, i) => note(ctx, now + i * 0.09, f, 0.35, 0.07));
+  if (name === "draw") [440, 440].forEach((f, i) => note(ctx, now + i * 0.2, f, 0.45, 0.06));
   if (name === "win") [392, 523, 659, 784].forEach((f, i) => note(ctx, now + i * 0.11, f, 0.5, 0.08));
   if (name === "lose") [392, 330, 262].forEach((f, i) => note(ctx, now + i * 0.16, f, 0.55, 0.07));
 }
 
 // The sound for one move-log entry.
-export function soundForMove(entry: { captured: unknown[]; notation: string }): SoundName {
-  if (entry.notation.includes("crown")) return "crown";
+export function soundForMove(entry: { captured: unknown[]; check: boolean; promotion?: string }): SoundName {
+  if (entry.check) return "check";
+  if (entry.promotion) return "promote";
   return entry.captured.length > 0 ? "capture" : "move";
 }

@@ -1,0 +1,5 @@
+/* Theme entry point. tokens.css holds every colour, radius, font and timing. */
+@import "./tokens.css";
+@import "./base.css";
+@import "./game.css";
+@import "./screens.css";

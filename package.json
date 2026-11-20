@@ -1,0 +1,47 @@
+{
+  "name": "knight-checkers",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "dev:local": "vite --host 127.0.0.1 --port 4174 --strictPort",
+    "dev:multiplayer": "concurrently --kill-others --names SERVER,WEB --prefix-colors magenta,cyan \"npm:server:dev\" \"npm:dev:local\"",
+    "server:dev": "tsx watch server/game-server.ts",
+    "server:start": "tsx server/game-server.ts",
+    "preview:local": "vite preview --host 127.0.0.1 --port 4174 --strictPort",
+    "build": "tsc && vite build",
+    "art": "node art/board.mjs && node art/render.mjs",
+    "test": "vitest run",
+    "mobile:icons": "node scripts/make-app-icon.mjs && capacitor-assets generate --ios --android --iconBackgroundColor #3f5668 --splashBackgroundColor #0a0607 --splashBackgroundColorDark #0a0607",
+    "mobile:sync": "npm run build && cap sync"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/ios": "^8.5.3",
+    "@capacitor/status-bar": "^8.0.4",
+    "@fontsource-variable/inter": "^5.3.0",
+    "@fontsource-variable/unbounded": "^5.3.0",
+    "lucide-react": "^1.21.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
+    "tsx": "^4.23.12"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.3",
+    "@types/node": "^26.2.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
+    "concurrently": "^10.0.4",
+    "playwright": "^1.64.1",
+    "three": "^0.186.1",
+    "typescript": "^6.0.3",
+    "vite": "^8.1.0",
+    "vitest": "^4.1.9"
+  }
+}

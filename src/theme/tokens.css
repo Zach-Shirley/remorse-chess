@@ -1,0 +1,65 @@
+/* Design tokens. Everything visual in the app reads from here; a new game restyles by editing
+   this file (and swapping the rendered art in src/assets). */
+:root {
+  /* Surfaces: near-black with a warm red cast */
+  --ink-0: #0a0607;
+  --ink-1: #110b0d;
+  --ink-2: #191113;
+  --ink-3: #231719;
+  --ink-4: #2f2023;
+  --glass: rgba(255, 240, 240, 0.045);
+  --glass-strong: rgba(255, 240, 240, 0.085);
+  --line: rgba(255, 228, 228, 0.1);
+  --line-strong: rgba(255, 228, 228, 0.2);
+
+  /* Text */
+  --text: #f7f0ef;
+  --text-soft: #cdbfbf;
+  --text-mute: #948487;
+
+  /* Brand and signals */
+  --crimson: #d92b3a;
+  --crimson-bright: #f24f5b;
+  --crimson-deep: #8a1221;
+  --crimson-glow: rgba(217, 43, 58, 0.38);
+  /* Amber is reserved for "your attention here": the side to move, selections, legal moves. */
+  --amber: #f6b740;
+  --amber-soft: rgba(246, 183, 64, 0.2);
+  --ok: #54d394;
+  --warn: #ff8f6b;
+
+  /* Board (keep in step with art/board.mjs) */
+  --board-light: #e4dac7;
+  --board-dark: #3f5668;
+  --board-frame-top: #24121a;
+  --board-frame-bottom: #0d0709;
+  --side-red: #d3202f;
+  --side-black: #25262c;
+
+  /* Shape */
+  --r-xs: 8px;
+  --r-sm: 12px;
+  --r-md: 16px;
+  --r-lg: 22px;
+  --r-xl: 28px;
+  --r-pill: 999px;
+
+  /* Type */
+  --font-display: "Unbounded Variable", "Unbounded", "Inter Variable", system-ui, sans-serif;
+  --font-body: "Inter Variable", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Depth and motion */
+  --shadow-panel: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --shadow-pop: 0 30px 80px rgba(0, 0, 0, 0.65);
+  --ease-out: cubic-bezier(0.22, 0.84, 0.34, 1);
+  --ease-spring: cubic-bezier(0.3, 1.4, 0.5, 1);
+  --slide-ms: 300ms;
+  --hop-ms: 430ms;
+
+  /* Layout */
+  --panel-width: 372px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+}

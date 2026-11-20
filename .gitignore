@@ -1,0 +1,10 @@
+node_modules/
+dist/
+dev-server*.log
+dev-local*.log
+.vercel/
+CLAUDE_TASK.md
+.env*
+.claude/
+art/out/
+store/screenshots/raw/

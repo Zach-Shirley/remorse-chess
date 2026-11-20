@@ -7,15 +7,15 @@ function snapshotWith(chatTexts: string[]): RoomSnapshot {
   return {
     code: "ABC123",
     stage: "playing",
-    rules: { forceCheckerCaptures: true },
+    rules: {},
     game: createInitialState(),
     players: {
-      red: { name: "anything a stranger typed", player: "red", connected: true, isHost: true },
+      white: { name: "anything a stranger typed", player: "white", connected: true, isHost: true },
       black: null
     },
     rematchVotes: [],
-    chat: chatTexts.map((text, index) => ({ id: String(index), player: "red", text, sentAt: index })),
-    disconnectDeadlines: { red: null, black: null },
+    chat: chatTexts.map((text, index) => ({ id: String(index), player: "white", text, sentAt: index })),
+    disconnectDeadlines: { white: null, black: null },
     revision: 1
   };
 }
@@ -28,14 +28,14 @@ describe("free-text filter", () => {
 
   it("replaces typed display names with seat names and keeps empty seats empty", () => {
     const filtered = withoutFreeText(snapshotWith([]));
-    expect(filtered.players.red?.name).toBe("Red player");
-    expect(filtered.players.red?.connected).toBe(true);
+    expect(filtered.players.white?.name).toBe("White player");
+    expect(filtered.players.white?.connected).toBe(true);
     expect(filtered.players.black).toBeNull();
   });
 
   it("keeps generated display names", () => {
     const snapshot = snapshotWith([]);
-    snapshot.players.red = { ...snapshot.players.red!, name: "SwiftFalcon27" };
-    expect(withoutFreeText(snapshot).players.red?.name).toBe("SwiftFalcon27");
+    snapshot.players.white = { ...snapshot.players.white!, name: "SwiftFalcon27" };
+    expect(withoutFreeText(snapshot).players.white?.name).toBe("SwiftFalcon27");
   });
 });

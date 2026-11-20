@@ -5,8 +5,8 @@ import { Server, type Socket } from "socket.io";
 import {
   applyMove,
   createInitialState,
-  endTurnEarly,
   normalizeRules,
+  sameRules,
   resignGame,
   type GameRules,
   type GameState,
@@ -62,7 +62,7 @@ type QueueEntry = {
 };
 
 const ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-const DEFAULT_PORT = 4175;
+const DEFAULT_PORT = 4275;
 const MAX_CHAT_MESSAGES = 80;
 const MAX_CHAT_LENGTH = 240;
 const CHAT_COOLDOWN_MS = 350;
@@ -78,9 +78,8 @@ export function createGameServer(
   const allowedOrigins = (
     process.env.CLIENT_ORIGINS ??
     [
-      "http://127.0.0.1:4174",
-      "http://localhost:4174",
-      "http://knight-checkers.127.0.0.1.sslip.io:4174"
+      "http://127.0.0.1:4274",
+      "http://localhost:4274"
     ].join(",")
   )
     .split(",")
@@ -121,7 +120,7 @@ export function createGameServer(
       }
 
       // The joiner takes whichever color the host left open.
-      const openSeat: Player | null = !room.players.red ? "red" : !room.players.black ? "black" : null;
+      const openSeat: Player | null = !room.players.white ? "white" : !room.players.black ? "black" : null;
       if (!openSeat) {
         ackFailure(ack, "That room is already full.");
         return;
@@ -165,12 +164,12 @@ export function createGameServer(
       }
 
       const { room, player } = membership;
-      if (!room.players.red || !room.players.black) {
+      if (!room.players.white || !room.players.black) {
         ackFailure(ack, "The game is still waiting for another player.");
         return;
       }
 
-      const opponent = player === "red" ? "black" : "red";
+      const opponent = player === "white" ? "black" : "white";
       if (!room.players[opponent]?.connected) {
         ackFailure(ack, "Wait for your opponent to reconnect.");
         return;
@@ -194,29 +193,6 @@ export function createGameServer(
         broadcastRoom(room);
       } catch {
         ackFailure(ack, "That move is no longer legal.");
-      }
-    });
-
-    socket.on("room:end-jump", (ack) => {
-      const membership = getMembership(socket);
-      if (!membership) {
-        ackFailure(ack, "You are not in a game.");
-        return;
-      }
-
-      const { room, player } = membership;
-      if (room.game.currentPlayer !== player) {
-        ackFailure(ack, "It is not your turn.");
-        return;
-      }
-
-      try {
-        room.game = endTurnEarly(room.game);
-        bumpRevision(room);
-        ackSuccess(ack, null);
-        broadcastRoom(room);
-      } catch {
-        ackFailure(ack, "There is no optional jump to end.");
       }
     });
 
@@ -248,12 +224,12 @@ export function createGameServer(
       }
 
       const { room, player } = membership;
-      if (room.game.status.phase !== "won") {
+      if (room.game.status.phase === "playing") {
         ackFailure(ack, "The current game is not finished.");
         return;
       }
 
-      const opponent = player === "red" ? "black" : "red";
+      const opponent = player === "white" ? "black" : "white";
       if (!room.players[opponent]?.connected) {
         ackFailure(ack, "Your opponent is no longer in the room.");
         return;
@@ -320,7 +296,7 @@ export function createGameServer(
         return;
       }
 
-      if (room.players.red && room.players.black) {
+      if (room.players.white && room.players.black) {
         ackFailure(ack, "Rules cannot change after another player joins.");
         return;
       }
@@ -344,8 +320,7 @@ export function createGameServer(
       const opponentIndex = queue.findIndex(
         (entry) =>
           entry.socketId !== socket.id &&
-          entry.rules.forceCheckerCaptures ===
-            payload.rules.forceCheckerCaptures &&
+          sameRules(entry.rules, payload.rules) &&
           io.sockets.sockets.has(entry.socketId)
       );
 
@@ -378,10 +353,10 @@ export function createGameServer(
         return;
       }
 
-      // Quick match assigns colors at random; Red still moves first.
+      // Quick match assigns colors at random; White still moves first.
       const room = createRoom(rooms, payload.rules);
-      const waitingColor: Player = Math.random() < 0.5 ? "red" : "black";
-      const joiningColor: Player = waitingColor === "red" ? "black" : "red";
+      const waitingColor: Player = Math.random() < 0.5 ? "white" : "black";
+      const joiningColor: Player = waitingColor === "white" ? "black" : "white";
       seatPlayer(room, opponentSocket, waitingColor, opponent.name, opponent.playerId, true);
       seatPlayer(room, socket, joiningColor, payload.name, payload.playerId, false);
       rooms.set(room.code, room);
@@ -459,7 +434,7 @@ export function createGameServer(
     socket.data.session = undefined;
 
     // Leaving a room nobody else has joined closes it.
-    if (!room.players.red || !room.players.black) {
+    if (!room.players.white || !room.players.black) {
       deleteRoom(room);
       socket.emit("room:closed", "The room was closed.");
       return;
@@ -477,7 +452,7 @@ export function createGameServer(
       bumpRevision(room);
       broadcastRoom(room);
 
-      if (!room.players.red?.connected && !room.players.black?.connected) {
+      if (!room.players.white?.connected && !room.players.black?.connected) {
         deleteRoom(room);
       }
       return;
@@ -510,7 +485,7 @@ export function createGameServer(
       bumpRevision(room);
       broadcastRoom(room);
 
-      if (!room.players.red?.connected && !room.players.black?.connected) {
+      if (!room.players.white?.connected && !room.players.black?.connected) {
         deleteRoom(room);
       }
     }, disconnectGraceMs);
@@ -524,7 +499,7 @@ export function createGameServer(
   }
 
   function deleteRoom(room: GameRoom) {
-    clearDisconnectDeadline(room, "red");
+    clearDisconnectDeadline(room, "white");
     clearDisconnectDeadline(room, "black");
     rooms.delete(room.code);
   }
@@ -553,7 +528,7 @@ export function createGameServer(
     close() {
       return new Promise<void>((resolve) => {
         for (const room of rooms.values()) {
-          clearDisconnectDeadline(room, "red");
+          clearDisconnectDeadline(room, "white");
           clearDisconnectDeadline(room, "black");
         }
         io.close(() => resolve());
@@ -566,7 +541,7 @@ function createHealthServer() {
   return createServer((request, response) => {
     if (request.url === "/health") {
       response.writeHead(200, { "content-type": "application/json" });
-      response.end(JSON.stringify({ ok: true, service: "knight-checkers" }));
+      response.end(JSON.stringify({ ok: true, service: "chess-base" }));
       return;
     }
 
@@ -586,11 +561,11 @@ function createRoom(rooms: Map<string, GameRoom>, rules: GameRules): GameRoom {
     code,
     rules: normalizedRules,
     game: createInitialState(normalizedRules),
-    players: { red: null, black: null },
+    players: { white: null, black: null },
     rematchVotes: new Set<Player>(),
     chat: [],
-    disconnectDeadlines: { red: null, black: null },
-    disconnectTimers: { red: null, black: null },
+    disconnectDeadlines: { white: null, black: null },
+    disconnectTimers: { white: null, black: null },
     revision: 1
   };
 }
@@ -646,15 +621,15 @@ function sessionFor(room: GameRoom, player: Player): PlayerSession {
 function snapshotRoom(room: GameRoom): RoomSnapshot {
   return {
     code: room.code,
-    stage: room.players.red && room.players.black
-      ? room.game.status.phase === "won"
-        ? "finished"
-        : "playing"
+    stage: room.players.white && room.players.black
+      ? room.game.status.phase === "playing"
+        ? "playing"
+        : "finished"
       : "waiting",
     rules: room.rules,
     game: room.game,
     players: {
-      red: publicSeat(room.players.red),
+      white: publicSeat(room.players.white),
       black: publicSeat(room.players.black)
     },
     rematchVotes: [...room.rematchVotes],
@@ -681,10 +656,10 @@ function bumpRevision(room: GameRoom) {
   room.revision += 1;
 }
 
-// Older clients send no color and expect to host as Red.
+// Older clients send no color and expect to host as White.
 function resolveColor(choice: unknown): Player {
-  if (choice === "random") return Math.random() < 0.5 ? "red" : "black";
-  return choice === "black" ? "black" : "red";
+  if (choice === "random") return Math.random() < 0.5 ? "white" : "black";
+  return choice === "black" ? "black" : "white";
 }
 
 // Only generated names are shown to other players; anything else becomes "Guest".
@@ -730,7 +705,7 @@ if (isDirectRun) {
   gameServer
     .listen()
     .then((port) => {
-      process.stdout.write(`Knight Checkers game server listening on ${host}:${port}\n`);
+      process.stdout.write(`Chess game server listening on ${host}:${port}\n`);
     })
     .catch((error: unknown) => {
       process.stderr.write(`${String(error)}\n`);

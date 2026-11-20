@@ -5,7 +5,7 @@ import { isQuickChatMessage, type RoomSnapshot } from "./protocol";
 // No player ever sees free-form text from another (App Store guideline 1.2, user-generated
 // content). The server already allows only quick messages and generated names; this repeats
 // the check on the client in case it talks to an older server.
-const SEAT_NAMES: Record<Player, string> = { red: "Red player", black: "Black player" };
+const SEAT_NAMES: Record<Player, string> = { white: "White player", black: "Black player" };
 
 export function withoutFreeText(snapshot: RoomSnapshot): RoomSnapshot {
   const seat = (player: Player) => {
@@ -15,7 +15,7 @@ export function withoutFreeText(snapshot: RoomSnapshot): RoomSnapshot {
   };
   return {
     ...snapshot,
-    players: { red: seat("red"), black: seat("black") },
+    players: { white: seat("white"), black: seat("black") },
     chat: snapshot.chat.filter((message) => isQuickChatMessage(message.text))
   };
 }

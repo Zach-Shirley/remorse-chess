@@ -50,51 +50,51 @@ describe("multiplayer game server", () => {
   }
 
   it("creates a private room, joins it, and synchronizes an authoritative move", async () => {
-    const redClient = await newClient();
+    const whiteClient = await newClient();
     const blackClient = await newClient();
-    const redConnection = await createRoom(redClient, {
+    const whiteConnection = await createRoom(whiteClient, {
       name: "SwiftFalcon27",
-      rules: { forceCheckerCaptures: true }
+      rules: {}
     });
-    const redJoinedState = waitForState(
-      redClient,
+    const whiteJoinedState = waitForState(
+      whiteClient,
       (state) => state.players.black?.name === "BraveOtter42"
     );
     const blackConnection = await joinRoom(blackClient, {
       name: "BraveOtter42",
-      code: redConnection.snapshot.code
+      code: whiteConnection.snapshot.code
     });
 
     expect(blackConnection.snapshot.stage).toBe("playing");
-    expect((await redJoinedState).players.black?.connected).toBe(true);
+    expect((await whiteJoinedState).players.black?.connected).toBe(true);
 
     const initialMove = getLegalMoves(blackConnection.snapshot.game)[0];
     const rejected = await move(blackClient, initialMove.id);
     expect(rejected).toEqual({ ok: false, message: "It is not your turn." });
 
-    const redUpdated = waitForState(redClient, (state) => state.game.moveLog.length === 1);
+    const whiteUpdated = waitForState(whiteClient, (state) => state.game.moveLog.length === 1);
     const blackUpdated = waitForState(blackClient, (state) => state.game.moveLog.length === 1);
-    expect(await move(redClient, initialMove.id)).toEqual({ ok: true, data: null });
+    expect(await move(whiteClient, initialMove.id)).toEqual({ ok: true, data: null });
 
-    const [redState, blackState] = await Promise.all([redUpdated, blackUpdated]);
-    expect(redState.game).toEqual(blackState.game);
-    expect(redState.game.currentPlayer).toBe("black");
+    const [whiteState, blackState] = await Promise.all([whiteUpdated, blackUpdated]);
+    expect(whiteState.game).toEqual(blackState.game);
+    expect(whiteState.game.currentPlayer).toBe("black");
   });
 
   it("restores a disconnected seat with its reconnect token", async () => {
-    const redClient = await newClient();
+    const whiteClient = await newClient();
     const blackClient = await newClient();
-    const redConnection = await createRoom(redClient, {
+    const whiteConnection = await createRoom(whiteClient, {
       name: "Host",
-      rules: { forceCheckerCaptures: false }
+      rules: {}
     });
     const blackConnection = await joinRoom(blackClient, {
       name: "Guest",
-      code: redConnection.snapshot.code
+      code: whiteConnection.snapshot.code
     });
 
     const disconnectedState = waitForState(
-      redClient,
+      whiteClient,
       (state) => state.players.black?.connected === false
     );
     blackClient.close();
@@ -102,21 +102,21 @@ describe("multiplayer game server", () => {
     expect(disconnected.disconnectDeadlines.black).not.toBeNull();
 
     const legalMove = getLegalMoves(blackConnection.snapshot.game)[0];
-    expect(await move(redClient, legalMove.id)).toEqual({
+    expect(await move(whiteClient, legalMove.id)).toEqual({
       ok: false,
       message: "Wait for your opponent to reconnect."
     });
 
     const resumedClient = await newClient();
-    const redReconnectedState = waitForState(
-      redClient,
+    const whiteReconnectedState = waitForState(
+      whiteClient,
       (state) => state.players.black?.connected === true
     );
     const resumed = await resumeRoom(resumedClient, blackConnection.session);
     expect(resumed.snapshot.players.black?.name).toBe("Guest");
-    expect((await redReconnectedState).players.black?.connected).toBe(true);
+    expect((await whiteReconnectedState).players.black?.connected).toBe(true);
     expect(resumed.snapshot.disconnectDeadlines.black).toBeNull();
-    expect(await move(redClient, legalMove.id)).toEqual({ ok: true, data: null });
+    expect(await move(whiteClient, legalMove.id)).toEqual({ ok: true, data: null });
   });
 
   it("ends the game by resignation when a disconnected player misses the grace period", async () => {
@@ -125,19 +125,19 @@ describe("multiplayer game server", () => {
     const port = await gameServer.listen(0);
     serverUrl = `http://127.0.0.1:${port}`;
 
-    const redClient = await newClient();
+    const whiteClient = await newClient();
     const blackClient = await newClient();
-    const room = await createRoom(redClient, {
-      name: "Red",
-      rules: { forceCheckerCaptures: true }
+    const room = await createRoom(whiteClient, {
+      name: "White",
+      rules: {}
     });
     await joinRoom(blackClient, { name: "Black", code: room.snapshot.code });
 
     const pausedState = waitForState(
-      redClient,
+      whiteClient,
       (state) => state.disconnectDeadlines.black !== null
     );
-    const finishedState = waitForState(redClient, (state) => state.stage === "finished");
+    const finishedState = waitForState(whiteClient, (state) => state.stage === "finished");
     blackClient.close();
 
     const paused = await pausedState;
@@ -148,22 +148,22 @@ describe("multiplayer game server", () => {
     expect(finished.disconnectDeadlines.black).toBeNull();
     expect(finished.game.status).toMatchObject({
       phase: "won",
-      winner: "red",
+      winner: "white",
       reason: "resignation"
     });
   });
 
   it("records resignation and starts a rematch after both players accept", async () => {
-    const redClient = await newClient();
+    const whiteClient = await newClient();
     const blackClient = await newClient();
-    const room = await createRoom(redClient, {
-      name: "Red",
-      rules: { forceCheckerCaptures: true }
+    const room = await createRoom(whiteClient, {
+      name: "White",
+      rules: {}
     });
     await joinRoom(blackClient, { name: "Black", code: room.snapshot.code });
 
-    const finishedState = waitForState(redClient, (state) => state.stage === "finished");
-    expect(await resign(redClient)).toEqual({ ok: true, data: null });
+    const finishedState = waitForState(whiteClient, (state) => state.stage === "finished");
+    expect(await resign(whiteClient)).toEqual({ ok: true, data: null });
     const finished = await finishedState;
     expect(finished.game.status).toMatchObject({
       phase: "won",
@@ -173,52 +173,52 @@ describe("multiplayer game server", () => {
 
     const requestedState = waitForState(
       blackClient,
-      (state) => state.rematchVotes.includes("red")
+      (state) => state.rematchVotes.includes("white")
     );
-    expect(await rematch(redClient)).toEqual({ ok: true, data: null });
-    expect((await requestedState).rematchVotes).toEqual(["red"]);
+    expect(await rematch(whiteClient)).toEqual({ ok: true, data: null });
+    expect((await requestedState).rematchVotes).toEqual(["white"]);
     const restartedState = waitForState(
-      redClient,
+      whiteClient,
       (state) => state.stage === "playing" && state.rematchVotes.length === 0
     );
     expect(await rematch(blackClient)).toEqual({ ok: true, data: null });
     const restarted = await restartedState;
     expect(restarted.game.moveLog).toHaveLength(0);
-    expect(restarted.game.currentPlayer).toBe("red");
+    expect(restarted.game.currentPlayer).toBe("white");
   });
 
   it("shows only generated names and keeps player IDs private", async () => {
-    const redClient = await newClient();
+    const whiteClient = await newClient();
     const blackClient = await newClient();
-    const room = await createRoom(redClient, {
+    const room = await createRoom(whiteClient, {
       name: "anything typed",
       playerId: "1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed",
-      rules: { forceCheckerCaptures: true }
+      rules: {}
     });
     const joined = await joinRoom(blackClient, { name: "CalmHeron31", code: room.snapshot.code });
 
-    expect(joined.snapshot.players.red?.name).toBe("Guest");
+    expect(joined.snapshot.players.white?.name).toBe("Guest");
     expect(joined.snapshot.players.black?.name).toBe("CalmHeron31");
     expect(JSON.stringify(joined.snapshot)).not.toContain("1b9d6bcd");
   });
 
   it("synchronizes quick-message chat and rejects free text", async () => {
-    const redClient = await newClient();
+    const whiteClient = await newClient();
     const blackClient = await newClient();
-    const room = await createRoom(redClient, {
-      name: "Red",
-      rules: { forceCheckerCaptures: true }
+    const room = await createRoom(whiteClient, {
+      name: "White",
+      rules: {}
     });
     await joinRoom(blackClient, { name: "Black", code: room.snapshot.code });
 
-    const redChatState = waitForState(redClient, (state) => state.chat.length === 1);
+    const whiteChatState = waitForState(whiteClient, (state) => state.chat.length === 1);
     const blackChatState = waitForState(blackClient, (state) => state.chat.length === 1);
-    expect(await sendChat(redClient, "  Good   luck!  ")).toEqual({ ok: true, data: null });
+    expect(await sendChat(whiteClient, "  Good   luck!  ")).toEqual({ ok: true, data: null });
 
-    const [redState, blackState] = await Promise.all([redChatState, blackChatState]);
-    expect(redState.chat).toEqual(blackState.chat);
-    expect(redState.chat[0]).toMatchObject({
-      player: "red",
+    const [whiteState, blackState] = await Promise.all([whiteChatState, blackChatState]);
+    expect(whiteState.chat).toEqual(blackState.chat);
+    expect(whiteState.chat[0]).toMatchObject({
+      player: "white",
       text: "Good luck!"
     });
     expect(await sendChat(blackClient, "anything a stranger might type")).toEqual({
@@ -232,26 +232,26 @@ describe("multiplayer game server", () => {
   });
 
   it("records an active departure and prevents an orphaned rematch request", async () => {
-    const redClient = await newClient();
+    const whiteClient = await newClient();
     const blackClient = await newClient();
-    const room = await createRoom(redClient, {
-      name: "Red",
-      rules: { forceCheckerCaptures: true }
+    const room = await createRoom(whiteClient, {
+      name: "White",
+      rules: {}
     });
     await joinRoom(blackClient, { name: "Black", code: room.snapshot.code });
 
     const departedState = waitForState(
-      redClient,
+      whiteClient,
       (state) => state.stage === "finished" && state.players.black?.connected === false
     );
     expect(await leaveRoom(blackClient)).toEqual({ ok: true, data: null });
     const departed = await departedState;
     expect(departed.game.status).toMatchObject({
       phase: "won",
-      winner: "red",
+      winner: "white",
       reason: "resignation"
     });
-    expect(await rematch(redClient)).toEqual({
+    expect(await rematch(whiteClient)).toEqual({
       ok: false,
       message: "Your opponent is no longer in the room."
     });
@@ -261,8 +261,8 @@ describe("multiplayer game server", () => {
     const firstClient = await newClient();
     const secondClient = await newClient();
     const payload: MatchmakingPayload = {
-      name: "Queued Red",
-      rules: { forceCheckerCaptures: true }
+      name: "Queued White",
+      rules: {}
     };
 
     expect(await joinMatchmaking(firstClient, payload)).toEqual({
@@ -280,24 +280,24 @@ describe("multiplayer game server", () => {
     const [first, second] = await Promise.all([firstMatched, secondMatched]);
     expect(first.snapshot.code).toBe(second.snapshot.code);
     // Colors are random, but the two players always get opposite ones.
-    expect([first.session.player, second.session.player].sort()).toEqual(["black", "red"]);
+    expect([first.session.player, second.session.player].sort()).toEqual(["black", "white"]);
   });
 
-  it("lets the room creator choose Black and seats the joiner as Red", async () => {
+  it("lets the room creator choose Black and seats the joiner as White", async () => {
     const hostClient = await newClient();
     const guestClient = await newClient();
     const room = await createRoom(hostClient, {
       name: "CalmHeron31",
-      rules: { forceCheckerCaptures: true },
+      rules: {},
       color: "black"
     });
     expect(room.session.player).toBe("black");
 
     const joined = await joinRoom(guestClient, { name: "BoldOtter12", code: room.snapshot.code });
-    expect(joined.session.player).toBe("red");
+    expect(joined.session.player).toBe("white");
     expect(joined.snapshot.stage).toBe("playing");
-    // Red always moves first.
-    expect(joined.snapshot.game.currentPlayer).toBe("red");
+    // White always moves first.
+    expect(joined.snapshot.game.currentPlayer).toBe("white");
     expect(await joinRoom(await newClient(), { name: "WiseLynx44", code: room.snapshot.code }).catch((error: Error) => error.message)).toBe(
       "That room is already full."
     );

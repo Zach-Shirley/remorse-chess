@@ -63,7 +63,7 @@ export type ServerResponse<T> =
 export type ServerAck<T> = (response: ServerResponse<T>) => void;
 
 // `name` must be a generated display name; `playerId` is the device's permanent ID (for ratings later).
-// The room creator's color; the joiner gets the other one. Red always moves first.
+// The room creator's color; the joiner gets the other one. White always moves first.
 export type ColorChoice = Player | "random";
 export type CreateRoomPayload = { name: string; playerId?: string; rules: GameRules; color?: ColorChoice };
 export type JoinRoomPayload = { code: string; name: string; playerId?: string };
@@ -84,7 +84,6 @@ export type ClientToServerEvents = {
     ack: ServerAck<RoomConnection>
   ) => void;
   "room:move": (moveId: string, ack: ServerAck<null>) => void;
-  "room:end-jump": (ack: ServerAck<null>) => void;
   "room:resign": (ack: ServerAck<null>) => void;
   "room:rematch": (ack: ServerAck<null>) => void;
   "room:chat": (message: string, ack: ServerAck<null>) => void;

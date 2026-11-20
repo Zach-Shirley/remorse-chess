@@ -4,9 +4,9 @@ Chess where the pieces have a conscience. Every capture weighs on the piece that
 
 The variant is by **Bardelo Bardalini**, who published it in five YouTube Shorts in November 2026. This is an independent implementation of what he describes there.
 
-**Status: complete and tested in the browser, not yet deployed.** Nothing has been played on a real phone or by real opponents yet.
+**Status: complete, deployed and playable.** Nothing has been played on a real phone or by real opponents yet.
 
-**Play it:** LIVE_URL_PLACEHOLDER
+**Play it:** https://remorse-chess.vercel.app
 
 The first online connection can take up to a minute: the multiplayer server runs on a free tier and sleeps when nobody is playing. Pass & Play and the bot work instantly and offline.
 

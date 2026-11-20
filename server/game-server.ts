@@ -545,7 +545,7 @@ function createHealthServer() {
   return createServer((request, response) => {
     if (request.url === "/health") {
       response.writeHead(200, { "content-type": "application/json" });
-      response.end(JSON.stringify({ ok: true, service: "chess-base" }));
+      response.end(JSON.stringify({ ok: true, service: "remorse-chess" }));
       return;
     }
 

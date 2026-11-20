@@ -13,7 +13,7 @@
     "build": "tsc && vite build",
     "art": "node art/board.mjs && node art/render.mjs",
     "test": "vitest run",
-    "mobile:icons": "node scripts/make-app-icon.mjs && capacitor-assets generate --ios --android --iconBackgroundColor #476078 --splashBackgroundColor #0a0607 --splashBackgroundColorDark #0a0607",
+    "mobile:icons": "node scripts/make-app-icon.mjs && capacitor-assets generate --ios --android --iconBackgroundColor #3f2a99 --splashBackgroundColor #07060d --splashBackgroundColorDark #07060d",
     "mobile:sync": "npm run build && cap sync"
   },
   "dependencies": {

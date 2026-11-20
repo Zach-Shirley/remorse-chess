@@ -4,7 +4,7 @@ const LEVELS = Object.keys(BOT_LEVELS) as BotLevel[];
 
 export function BotLevelPicker({ value, onChange }: { value: BotLevel; onChange: (level: BotLevel) => void }) {
   return (
-    <div className="bot-levels" role="radiogroup" aria-label="Bot difficulty">
+    <div className="option-cards" role="radiogroup" aria-label="Bot difficulty">
       {LEVELS.map((level, index) => (
         <button
           key={level}

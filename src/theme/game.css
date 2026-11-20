@@ -164,12 +164,12 @@
 
 .board-frame {
   padding: clamp(6px, 1.4vw, 12px);
-  border: 1px solid rgba(255, 210, 215, 0.14);
+  border: 1px solid rgba(220, 212, 255, 0.14);
   border-radius: var(--r-lg);
   background: linear-gradient(160deg, var(--board-frame-top), var(--board-frame-bottom));
   box-shadow:
     0 30px 70px rgba(0, 0, 0, 0.6),
-    0 0 90px rgba(217, 43, 58, 0.14),
+    0 0 90px rgba(112, 84, 224, 0.14),
     inset 0 1px 0 rgba(255, 255, 255, 0.1),
     inset 0 -1px 0 rgba(0, 0, 0, 0.6);
 }
@@ -324,29 +324,7 @@
   transform: translateY(-5%) scale(1.07);
 }
 
-/* A variant's per-piece status marker (Board's `pieceBadge`), pinned to the square's corner. */
-.piece-badge {
-  position: absolute;
-  right: 4%;
-  bottom: 5%;
-  display: grid;
-  width: 30%;
-  max-width: 22px;
-  aspect-ratio: 1;
-  place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  border-radius: 50%;
-  color: var(--text);
-  background: rgba(20, 12, 14, 0.82);
-  font-size: 0.6rem;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.piece-badge svg {
-  width: 62%;
-  height: 62%;
-}
+/* The per-piece status tokens (Board's `pieceBadge`) are styled in remorse.css. */
 
 .piece[class*="animate-"] {
   z-index: 6;
@@ -423,7 +401,7 @@
   flex-direction: column;
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
-  background: linear-gradient(180deg, rgba(35, 23, 25, 0.92), rgba(20, 13, 15, 0.92));
+  background: linear-gradient(180deg, rgba(28, 24, 42, 0.92), rgba(15, 13, 24, 0.92));
   box-shadow: var(--shadow-panel);
 }
 
@@ -666,7 +644,7 @@
 
 .chat-message.own p {
   border-radius: 14px 14px 4px 14px;
-  background: linear-gradient(180deg, rgba(217, 43, 58, 0.55), rgba(217, 43, 58, 0.38));
+  background: linear-gradient(180deg, rgba(112, 84, 224, 0.55), rgba(112, 84, 224, 0.38));
 }
 
 .quick-chat {
@@ -748,7 +726,7 @@
   display: grid;
   padding: 16px;
   border-radius: var(--r-lg);
-  background: rgba(8, 4, 5, 0.6);
+  background: rgba(5, 4, 10, 0.6);
   backdrop-filter: blur(5px);
   inset: 0;
   place-items: center;

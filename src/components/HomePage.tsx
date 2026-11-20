@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { BookOpen, Bot, ChevronRight, Globe, Users } from "lucide-react";
 import type { BotLevel } from "../bot";
-import { DEFAULT_GAME_RULES, type GameRules } from "../game";
+import type { GameRules } from "../game";
 import type { ColorChoice } from "../multiplayer/protocol";
 import heroTall from "../assets/hero-tall.webp";
 import heroWide from "../assets/hero.webp";
 import { BotLevelPicker } from "../ui/BotLevelPicker";
 import { ColorPicker } from "../ui/ColorPicker";
+import { RuleSetPicker, useRuleSetChoice } from "../ui/Conscience";
 import { RulesDialog, SoundToggle } from "../ui/GameChrome";
 import { Modal } from "../ui/Modal";
 
@@ -16,14 +17,15 @@ type HomePageProps = {
   onOpenMultiplayer: () => void;
 };
 
-type HomeDialog = "rules" | "bots" | null;
+type HomeDialog = "rules" | "bots" | "local" | null;
 
 export function HomePage({ onStartLocal, onStartBot, onOpenMultiplayer }: HomePageProps) {
   const [dialog, setDialog] = useState<HomeDialog>(null);
   const [botLevel, setBotLevel] = useState<BotLevel>("medium");
   const [botColor, setBotColor] = useState<ColorChoice>("white");
-  // Plain chess has no rule options. A variant keeps its options in state here and passes them on.
-  const rules = DEFAULT_GAME_RULES;
+  // The rule set is remembered on this device and offered wherever a game is set up.
+  const [ruleSet, setRuleSet] = useRuleSetChoice();
+  const rules: GameRules = { ruleSet };
 
   return (
     <main className="home-page">
@@ -38,12 +40,12 @@ export function HomePage({ onStartLocal, onStartBot, onOpenMultiplayer }: HomePa
       </div>
 
       <section className="home-menu" aria-labelledby="home-title">
-        <p className="home-kicker">The classic game of kings</p>
+        <p className="home-kicker">Chess with a conscience</p>
         <h1 id="home-title">
-          Play <span>Chess</span>
+          Remorse <span>Chess</span>
         </h1>
         <p className="home-summary">
-          Take on a bot, share one screen with a friend, or find an opponent online.
+          Every capture weighs on the piece that made it. Roll for its reaction, and keep a bishop close to absolve it.
         </p>
 
         <div className="home-actions" aria-label="Game modes">
@@ -63,7 +65,7 @@ export function HomePage({ onStartLocal, onStartBot, onOpenMultiplayer }: HomePa
             </span>
             <ChevronRight className="menu-arrow" aria-hidden="true" size={20} />
           </button>
-          <button className="menu-button" type="button" onClick={() => onStartLocal(rules)}>
+          <button className="menu-button" type="button" onClick={() => setDialog("local")}>
             <span className="menu-icon"><Users aria-hidden="true" size={22} /></span>
             <span className="menu-copy">
               <strong>Pass &amp; Play</strong>
@@ -80,7 +82,10 @@ export function HomePage({ onStartLocal, onStartBot, onOpenMultiplayer }: HomePa
       </section>
 
       {dialog === "bots" ? (
-        <Modal title="Play a bot" description="Pick a difficulty and a side." onClose={() => setDialog(null)}>
+        <Modal title="Play a bot" description="Pick the rules, a difficulty and a side." onClose={() => setDialog(null)}>
+          <span className="field-caption">Rule set</span>
+          <RuleSetPicker value={ruleSet} onChange={setRuleSet} />
+          <span className="field-caption">Difficulty</span>
           <BotLevelPicker value={botLevel} onChange={setBotLevel} />
           <ColorPicker value={botColor} onChange={setBotColor} />
           <div className="modal-actions">
@@ -93,6 +98,21 @@ export function HomePage({ onStartLocal, onStartBot, onOpenMultiplayer }: HomePa
               data-autofocus
               onClick={() => onStartBot(botLevel, rules, botColor)}
             >
+              Start game
+            </button>
+          </div>
+        </Modal>
+      ) : null}
+
+      {dialog === "local" ? (
+        <Modal title="Pass & play" description="Two players, one screen. Pick the rules." onClose={() => setDialog(null)}>
+          <span className="field-caption">Rule set</span>
+          <RuleSetPicker value={ruleSet} onChange={setRuleSet} />
+          <div className="modal-actions">
+            <button className="button secondary" type="button" onClick={() => setDialog(null)}>
+              Cancel
+            </button>
+            <button className="button primary" type="button" data-autofocus onClick={() => onStartLocal(rules)}>
               Start game
             </button>
           </div>

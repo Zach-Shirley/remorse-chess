@@ -1,9 +1,9 @@
 // Small synthesized sound effects (no audio files). Muted state is remembered per device.
 import { useSyncExternalStore } from "react";
 
-export type SoundName = "move" | "capture" | "check" | "promote" | "win" | "lose" | "draw";
+export type SoundName = "move" | "capture" | "check" | "promote" | "win" | "lose" | "draw" | "dice" | "absolve" | "despair";
 
-const STORAGE_KEY = "chess-base:muted";
+const STORAGE_KEY = "remorse-chess:muted";
 let muted = readMuted();
 let context: AudioContext | null = null;
 const listeners = new Set<() => void>();
@@ -112,6 +112,14 @@ export function playSound(name: SoundName) {
   if (name === "draw") [440, 440].forEach((f, i) => note(ctx, now + i * 0.2, f, 0.45, 0.06));
   if (name === "win") [392, 523, 659, 784].forEach((f, i) => note(ctx, now + i * 0.11, f, 0.5, 0.08));
   if (name === "lose") [392, 330, 262].forEach((f, i) => note(ctx, now + i * 0.16, f, 0.55, 0.07));
+  // A die rattling to a stop: quick, uneven wooden clicks that slow down, after the move's own sound.
+  if (name === "dice") {
+    [0.16, 0.21, 0.27, 0.35, 0.46].forEach((offset, i) => tock(ctx, now + offset, 420 - i * 35, 0.1 + i * 0.012));
+  }
+  // Absolution: a soft rising fifth, like a small bell.
+  if (name === "absolve") [659, 988].forEach((f, i) => note(ctx, now + 0.12 + i * 0.13, f, 0.6, 0.05));
+  // A piece lost to despair: two low falling notes.
+  if (name === "despair") [233, 175].forEach((f, i) => note(ctx, now + 0.12 + i * 0.22, f, 0.7, 0.07));
 }
 
 // The sound for one move-log entry.

@@ -21,7 +21,7 @@ body {
   margin: 0;
   color: var(--text);
   background:
-    radial-gradient(1200px 700px at 12% -10%, rgba(217, 43, 58, 0.2), transparent 60%),
+    radial-gradient(1200px 700px at 12% -10%, rgba(112, 84, 224, 0.2), transparent 60%),
     radial-gradient(900px 600px at 105% 110%, rgba(63, 86, 104, 0.22), transparent 60%),
     var(--ink-0);
   background-attachment: fixed;
@@ -133,14 +133,14 @@ img {
 }
 
 .button.primary {
-  border-color: rgba(255, 160, 165, 0.35);
-  background: linear-gradient(180deg, var(--crimson-bright), var(--crimson) 45%, #b01d2c);
-  box-shadow: 0 10px 26px var(--crimson-glow), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  border-color: rgba(186, 170, 255, 0.35);
+  background: linear-gradient(180deg, var(--accent-bright), var(--accent) 45%, var(--accent-deep));
+  box-shadow: 0 10px 26px var(--accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.3);
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
 }
 
 .button.primary:hover:not(:disabled) {
-  box-shadow: 0 14px 34px var(--crimson-glow), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  box-shadow: 0 14px 34px var(--accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.4);
   filter: brightness(1.07);
 }
 
@@ -150,8 +150,8 @@ img {
 }
 
 .button.secondary:hover:not(:disabled) {
-  border-color: rgba(255, 228, 228, 0.34);
-  background: rgba(255, 240, 240, 0.13);
+  border-color: rgba(228, 224, 255, 0.34);
+  background: rgba(240, 238, 255, 0.13);
 }
 
 .button.ghost {
@@ -294,8 +294,8 @@ img {
 }
 
 .setting-toggle input:checked + .toggle-track {
-  border-color: rgba(255, 160, 165, 0.5);
-  background: linear-gradient(180deg, var(--crimson-bright), var(--crimson));
+  border-color: rgba(186, 170, 255, 0.5);
+  background: linear-gradient(180deg, var(--accent-bright), var(--accent));
 }
 
 .setting-toggle input:checked + .toggle-track::after {
@@ -366,13 +366,13 @@ img {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
 }
 
-.bot-levels {
+.option-cards {
   display: grid;
   gap: 8px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.bot-levels button {
+.option-cards button {
   display: grid;
   align-content: start;
   padding: 12px;
@@ -384,25 +384,25 @@ img {
   transition: border-color 160ms, background 160ms, transform 140ms var(--ease-out);
 }
 
-.bot-levels button:hover {
+.option-cards button:hover {
   border-color: var(--line-strong);
 }
 
-.bot-levels button strong {
+.option-cards button strong {
   font-size: 0.95rem;
   font-weight: 650;
 }
 
-.bot-levels button small {
+.option-cards button small {
   color: var(--text-mute);
   font-size: 0.75rem;
   line-height: 1.35;
 }
 
-.bot-levels button.active {
-  border-color: rgba(255, 160, 165, 0.55);
-  background: linear-gradient(180deg, rgba(217, 43, 58, 0.28), rgba(217, 43, 58, 0.1));
-  box-shadow: 0 8px 22px rgba(217, 43, 58, 0.2);
+.option-cards button.active {
+  border-color: rgba(186, 170, 255, 0.55);
+  background: linear-gradient(180deg, rgba(112, 84, 224, 0.28), rgba(112, 84, 224, 0.1));
+  box-shadow: 0 8px 22px rgba(112, 84, 224, 0.2);
 }
 
 .level-pips {
@@ -418,8 +418,8 @@ img {
 }
 
 .level-pips i.lit {
-  background: var(--crimson-bright);
-  box-shadow: 0 0 8px var(--crimson-glow);
+  background: var(--accent-bright);
+  box-shadow: 0 0 8px var(--accent-glow);
 }
 
 .field-label {
@@ -437,7 +437,7 @@ img {
   padding: 20px;
   inset: 0;
   place-items: center;
-  background: rgba(6, 3, 4, 0.72);
+  background: rgba(4, 3, 8, 0.72);
   backdrop-filter: blur(10px);
   animation: backdrop-in 180ms ease both;
 }
@@ -741,7 +741,7 @@ img {
     animation-name: sheet-in;
   }
 
-  .bot-levels button small {
+  .option-cards button small {
     display: none;
   }
 

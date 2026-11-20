@@ -34,6 +34,8 @@ type BoardProps = {
   // Variant hooks: a status badge drawn over a piece, and extra class names for a square.
   pieceBadge?: (piece: Piece, square: Square) => ReactNode;
   squareClassName?: (square: Square, piece: Piece | null) => string;
+  // A piece's status in words ("guilt-ridden"): read out with the square, and set as data-status.
+  pieceStatus?: (piece: Piece) => string;
 };
 
 // The one board renderer, shared by local, bot and online games.
@@ -48,7 +50,8 @@ export function Board({
   onAnimationEnd,
   onSquareClick,
   pieceBadge,
-  squareClassName
+  squareClassName,
+  pieceStatus
 }: BoardProps) {
   const rows = perspective === "black" ? [...indexes].reverse() : indexes;
   const cols = perspective === "black" ? [...indexes].reverse() : indexes;
@@ -74,6 +77,7 @@ export function Board({
             const piece = getPieceAt(state, square);
             const target = targets.find((move) => move.to.row === row && move.to.col === col);
             const inCheck = Boolean(checked && checked.row === row && checked.col === col);
+            const status = piece && pieceStatus ? pieceStatus(piece) : "";
             const classes = [
               "square",
               isDarkSquare(square) ? "dark-square" : "light-square",
@@ -94,7 +98,8 @@ export function Board({
                 role="gridcell"
                 data-square={squareName(square)}
                 data-piece={piece ? `${piece.player}-${piece.kind}` : undefined}
-                aria-label={squareAriaLabel(square, piece, target, inCheck)}
+                data-status={status || undefined}
+                aria-label={squareAriaLabel(square, piece, target, inCheck, status)}
                 onClick={() => onSquareClick(square)}
               >
                 {visualCol === 0 ? <span className="rank-label" aria-hidden="true">{BOARD_SIZE - row}</span> : null}
@@ -117,8 +122,8 @@ export function Board({
   );
 }
 
-function squareAriaLabel(square: Square, piece: Piece | null, move: Move | undefined, inCheck: boolean) {
-  const contents = piece ? `${playerName(piece.player)} ${pieceName(piece.kind)}` : "empty";
+function squareAriaLabel(square: Square, piece: Piece | null, move: Move | undefined, inCheck: boolean, status: string) {
+  const contents = piece ? `${playerName(piece.player)} ${pieceName(piece.kind)}${status ? ` (${status})` : ""}` : "empty";
   const checkText = inCheck ? ", in check" : "";
   const moveText = move ? (move.captures.length > 0 ? ", capture destination" : ", legal destination") : "";
   return `${squareName(square)}, ${contents}${checkText}${moveText}`;

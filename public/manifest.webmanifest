@@ -1,12 +1,12 @@
 {
-  "name": "Chess",
-  "short_name": "Chess",
-  "description": "Play a bot, a friend on one screen, or an opponent online.",
+  "name": "Remorse Chess",
+  "short_name": "Remorse",
+  "description": "Chess where every capture weighs on the piece that made it. Play a bot, a friend on one screen, or an opponent online.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0a0607",
-  "theme_color": "#0a0607",
+  "background_color": "#07060d",
+  "theme_color": "#07060d",
   "icons": [
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }

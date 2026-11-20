@@ -1,0 +1,617 @@
+/* Remorse Chess: conscience tokens, the roll card, dice, the rule-set picker and the rules dialog.
+   Colours come from the "Consciences" group in tokens.css. */
+
+/* ---------- tokens under the pieces ---------- */
+
+/* Token sizes follow the board, not the viewport. */
+.board {
+  container-type: inline-size;
+}
+
+/* Board's `pieceBadge` slot: a row of tokens at the foot of the piece. It travels with the
+   piece during move animations. */
+.piece-badge,
+.conscience-tokens {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5cqw;
+}
+
+.piece-badge {
+  position: absolute;
+  z-index: 3;
+  right: 0;
+  bottom: -3%;
+  left: 0;
+  pointer-events: none;
+}
+
+.token {
+  display: grid;
+  width: 4.5cqw;
+  min-width: 15px;
+  max-width: 27px;
+  aspect-ratio: 1;
+  flex: none;
+  place-items: center;
+  border: 1.5px solid rgba(0, 0, 0, 0.55);
+  border-radius: 50%;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  font-family: var(--font-body);
+  font-size: clamp(9px, 2.7cqw, 15px);
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1;
+  animation: token-in 320ms var(--ease-spring) both;
+}
+
+.token svg {
+  width: 64%;
+  height: 64%;
+  stroke-width: 2.6;
+}
+
+/* Outside a board (the note, the legend) tokens have a fixed size. */
+.conscience-tokens .token {
+  width: 24px;
+  max-width: none;
+  font-size: 13px;
+  animation: none;
+}
+
+.token.guilty {
+  color: var(--guilt-ink);
+  background: var(--guilt);
+}
+
+.token.guilty svg {
+  fill: currentColor;
+  fill-opacity: 0.35;
+}
+
+.token.devastated {
+  color: var(--devastated-ink);
+  background: var(--devastated);
+  border-radius: 28%;
+}
+
+.token.sadist {
+  color: var(--sadist-ink);
+  background: var(--sadist);
+}
+
+.token.bloodlust {
+  color: var(--bloodlust-ink);
+  background: var(--bloodlust);
+  box-shadow: 0 0 0 1.5px var(--sadist), 0 2px 6px rgba(0, 0, 0, 0.55);
+}
+
+.token.unaffected {
+  width: 3.2cqw;
+  min-width: 11px;
+  max-width: 19px;
+  color: var(--unaffected-ink);
+  background: var(--unaffected);
+  opacity: 0.9;
+}
+
+.conscience-tokens .token.unaffected {
+  width: 18px;
+}
+
+.token.vendetta {
+  border-color: var(--vendetta-ink);
+  color: var(--vendetta-ink);
+  background: var(--vendetta);
+  box-shadow: 0 0 0 1.5px var(--vendetta), 0 2px 6px rgba(0, 0, 0, 0.55);
+  font-family: var(--font-display);
+  font-size: clamp(8px, 2.3cqw, 13px);
+}
+
+.conscience-tokens .token.vendetta {
+  font-size: 11px;
+}
+
+@keyframes token-in {
+  from { opacity: 0; transform: translateY(40%) scale(0.4); }
+}
+
+/* Afflicted pieces look it: guilt drains the colour, devastation slumps the piece. */
+.guilty-square .piece-art {
+  filter: saturate(0.5) brightness(0.9);
+}
+
+.devastated-square .piece-art {
+  filter: grayscale(0.9) brightness(0.72);
+  transform: rotate(-9deg);
+  transform-origin: 50% 88%;
+}
+
+/* The Sadist that may move again. */
+.extra-move-square::after {
+  position: absolute;
+  z-index: 1;
+  border: 3px solid var(--sadist);
+  border-radius: 14%;
+  box-shadow: 0 0 16px var(--sadist), inset 0 0 10px rgba(229, 54, 75, 0.45);
+  content: "";
+  inset: 4%;
+  pointer-events: none;
+  animation: ring-pulse 0.8s ease-in-out infinite alternate;
+}
+
+/* ---------- dice ---------- */
+
+.die {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  padding: 4px;
+  gap: 1px;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  border: 2px solid var(--unaffected);
+  border-radius: 7px;
+  background: var(--vendetta);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
+  animation: die-tumble 520ms var(--ease-spring) both;
+}
+
+.die i {
+  border-radius: 50%;
+}
+
+.die i.pip {
+  background: var(--vendetta-ink);
+}
+
+.die.guilty { border-color: var(--guilt); }
+.die.devastated { border-color: var(--devastated); }
+.die.sadist { border-color: var(--sadist); }
+.die.unaffected { border-color: var(--unaffected); }
+.die.vendetta { border-color: var(--amber); }
+
+@keyframes die-tumble {
+  0% { opacity: 0; transform: translateY(-14px) rotate(-200deg) scale(0.5); }
+  60% { opacity: 1; transform: translateY(2px) rotate(14deg) scale(1.08); }
+  100% { transform: none; }
+}
+
+/* ---------- the roll card ---------- */
+
+/* Sits over the opponent's bar and the top edge of the board for a few seconds. */
+.roll-card {
+  position: absolute;
+  z-index: 15;
+  top: 6px;
+  left: 50%;
+  display: grid;
+  width: max-content;
+  max-width: calc(100% - 12px);
+  padding: 8px 12px;
+  gap: 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: linear-gradient(180deg, var(--ink-4), var(--ink-2));
+  box-shadow: var(--shadow-pop);
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: roll-card-in 240ms var(--ease-out) both;
+}
+
+.roll-line {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.86rem;
+  animation: roll-line-in 260ms var(--ease-out) both;
+}
+
+.roll-who {
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+
+.roll-what {
+  overflow: hidden;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.roll-line.guilty .roll-what { color: var(--guilt); }
+.roll-line.devastated .roll-what,
+.roll-line.removed .roll-what { color: var(--devastated); }
+.roll-line.sadist .roll-what { color: var(--sadist); }
+.roll-line.bloodlust .roll-what { color: var(--bloodlust); }
+.roll-line.unaffected .roll-what { color: var(--text-soft); }
+.roll-line.vendetta .roll-what { color: var(--vendetta); }
+.roll-line.absolved .roll-what { color: var(--absolved); }
+
+.event-icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--absolved-ink);
+  background: var(--absolved);
+}
+
+.event-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.event-icon.guilty { color: var(--guilt-ink); background: var(--guilt); }
+.event-icon.devastated,
+.event-icon.removed { color: var(--devastated-ink); background: var(--devastated); }
+.event-icon.sadist { color: var(--sadist-ink); background: var(--sadist); }
+.event-icon.bloodlust { color: var(--bloodlust-ink); background: var(--bloodlust); }
+.event-icon.vendetta { color: var(--vendetta-ink); background: var(--vendetta); }
+
+@keyframes roll-card-in {
+  from { opacity: 0; transform: translate(-50%, -12px); }
+}
+
+@keyframes roll-line-in {
+  from { opacity: 0; transform: translateX(-8px); }
+}
+
+/* ---------- move list: what each move set off ---------- */
+
+.move-part {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* A Sadist's second move of the turn. */
+.move-part + .move-part::before {
+  margin: 0 3px;
+  color: var(--sadist);
+  content: "\203A";
+  font-weight: 800;
+}
+
+.event-chip {
+  display: inline-grid;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  place-items: center;
+  border-radius: 4px;
+  color: var(--unaffected-ink);
+  background: var(--unaffected);
+  font-size: 0.66rem;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.event-chip svg {
+  width: 10px;
+  height: 10px;
+  stroke-width: 3;
+}
+
+.event-chip.guilty { color: var(--guilt-ink); background: var(--guilt); }
+.event-chip.devastated,
+.event-chip.removed { color: var(--devastated-ink); background: var(--devastated); }
+.event-chip.sadist { color: var(--sadist-ink); background: var(--sadist); }
+.event-chip.bloodlust { color: var(--bloodlust-ink); background: var(--bloodlust); }
+.event-chip.vendetta { color: var(--vendetta-ink); background: var(--vendetta); }
+.event-chip.absolved { border-radius: 50%; color: var(--absolved-ink); background: var(--absolved); }
+
+.move-san.latest .event-chip {
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
+}
+
+/* ---------- side panel additions ---------- */
+
+.turn-status .end-turn {
+  min-height: 38px;
+  flex: none;
+  padding: 0 12px;
+  gap: 6px;
+  border-color: var(--sadist);
+  font-size: 0.82rem;
+}
+
+.conscience-note {
+  display: grid;
+  padding: 10px 16px 12px;
+  gap: 4px;
+  background: var(--glass);
+}
+
+.conscience-note-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.conscience-note-heading strong {
+  font-weight: 700;
+}
+
+.conscience-note p {
+  color: var(--text-soft);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.rule-set-chip {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  padding: 8px 16px;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+.rule-set-chip span {
+  color: var(--text-mute);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.rule-set-chip strong {
+  color: var(--accent-bright);
+  font-weight: 750;
+}
+
+.rule-set-chip small {
+  overflow: hidden;
+  color: var(--text-mute);
+  font-size: 0.76rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* In the waiting room the chip stands alone. */
+.waiting-room .rule-set-chip {
+  justify-content: center;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--glass);
+}
+
+/* ---------- rule-set picker ---------- */
+
+.lobby-rules {
+  display: grid;
+  gap: 8px;
+}
+
+.modal-dialog > .field-caption {
+  display: block;
+  margin-top: 16px;
+}
+
+.modal-dialog > .field-caption + * {
+  margin-top: 8px;
+}
+
+/* ---------- rules dialog ---------- */
+
+.rules-body {
+  display: grid;
+  gap: 14px;
+}
+
+.rules-section {
+  display: grid;
+  padding: 14px;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--glass);
+}
+
+.rules-section > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.rules-section h3 {
+  font-family: var(--font-display);
+  font-size: 0.98rem;
+  font-weight: 650;
+}
+
+.rules-flag {
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  color: var(--text-mute);
+  font-size: 0.68rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.rules-flag.on {
+  border-color: var(--accent-bright);
+  color: var(--accent-bright);
+}
+
+.rules-section.not-in-play .rule-lines,
+.rules-section.not-in-play .rules-intro {
+  opacity: 0.6;
+}
+
+.rules-intro {
+  color: var(--text-soft);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.rules-intro a,
+.video-links a {
+  color: var(--accent-bright);
+}
+
+.rule-lines {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  gap: 8px;
+  list-style: none;
+}
+
+.rule-lines li {
+  padding-left: 12px;
+  border-left: 2px solid var(--accent);
+  color: var(--text);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.rule-lines.interpretation li {
+  border-left-color: var(--amber);
+  color: var(--text-soft);
+}
+
+.rule-sources {
+  display: inline-flex;
+  margin-left: 6px;
+  gap: 4px;
+  vertical-align: 1px;
+}
+
+.rule-sources a {
+  padding: 1px 7px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  color: var(--accent-bright);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.rule-sources a:hover {
+  border-color: var(--accent-bright);
+}
+
+.token-legend {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  gap: 10px 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  list-style: none;
+}
+
+.token-legend li {
+  display: grid;
+  align-items: start;
+  gap: 10px;
+  grid-template-columns: 26px minmax(0, 1fr);
+}
+
+.token-legend .conscience-tokens {
+  margin-top: 1px;
+}
+
+.token-legend strong {
+  font-size: 0.86rem;
+}
+
+.token-legend p {
+  color: var(--text-soft);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.video-links {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  gap: 6px;
+  list-style: none;
+}
+
+.video-links a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.84rem;
+  text-decoration: none;
+}
+
+.video-links a span {
+  min-width: 56px;
+  color: var(--text-mute);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.video-links a:hover {
+  text-decoration: underline;
+}
+
+.chess-basics summary {
+  font-family: var(--font-display);
+  font-size: 0.98rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.chess-basics .rules-list {
+  margin-top: 4px;
+}
+
+/* ---------- narrow screens ---------- */
+
+@media (max-width: 980px) {
+  .conscience-note { order: 1; }
+  .rule-set-chip { order: 5; }
+
+  .roll-card {
+    top: 4px;
+  }
+
+  .roll-line {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 560px) {
+  /* Rule sets keep their one-line descriptions: stack them instead of hiding the text. */
+  .option-cards.rule-sets {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .option-cards.rule-sets button {
+    align-items: center;
+    padding: 9px 12px;
+    gap: 2px 10px;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .option-cards.rule-sets button small {
+    display: block;
+    grid-column: 1 / -1;
+  }
+
+  .token-legend {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rules-section {
+    padding: 12px;
+  }
+}

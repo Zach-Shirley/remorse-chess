@@ -2,7 +2,7 @@ import { generateDisplayName, isGeneratedName, isPlayerId } from "./multiplayer/
 
 export type PlayerIdentity = { id: string; name: string };
 
-const STORAGE_KEY = "chess-base:identity";
+const STORAGE_KEY = "remorse-chess:identity";
 
 // Each device gets one permanent identity: a random ID (for ratings and profiles later)
 // and a generated display name.

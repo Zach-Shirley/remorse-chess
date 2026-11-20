@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { BookOpen, Home, RotateCcw, Undo2 } from "lucide-react";
+import { BookOpen, Home, RotateCcw, SkipForward, Undo2 } from "lucide-react";
 import {
   type GameRules,
   type GameState,
   type Move,
   type Player,
   type Square,
+  PASS_MOVE_ID,
   applyMove,
+  canPass,
   createInitialState,
   getLegalMoves,
   getPieceAt,
@@ -15,9 +17,18 @@ import {
 } from "../game";
 import { BOT_LEVELS, type BotLevel } from "../bot";
 import { requestBotAction } from "../botClient";
+import { createLocalDice } from "../dice";
 import { getPlayerIdentity } from "../playerIdentity";
 import { playSound, soundForMove } from "../sound";
 import { Board, groupMovesByPiece, moveAnimation, movesTo } from "../ui/Board";
+import {
+  ConscienceNote,
+  EventFeed,
+  RuleSetChip,
+  conscienceAria,
+  conscienceBadge,
+  conscienceSquareClass
+} from "../ui/Conscience";
 import { MoveList, PlayerBar, RulesDialog, SoundToggle, TurnStatus } from "../ui/GameChrome";
 import { GameOverDialog } from "../ui/GameOverDialog";
 import { Modal } from "../ui/Modal";
@@ -43,6 +54,10 @@ type LocalGamePageProps = {
 export function LocalGamePage({ initialRules, onExit, bot, kicker }: LocalGamePageProps) {
   const [history, setHistory] = useState(() => [createInitialState(initialRules)]);
   const [selectedPieceId, setSelectedPieceId] = useState<string | null>(null);
+  // A piece the player tapped only to read its status (an enemy piece, or one that cannot move).
+  const [inspectedPieceId, setInspectedPieceId] = useState<string | null>(null);
+  // Local and bot games roll on this device.
+  const dice = useMemo(createLocalDice, []);
   const [pieceAnimation, setPieceAnimation] = useState<PieceAnimation | null>(null);
   const [dialog, setDialog] = useState<GameDialog>(null);
   // The promotion moves waiting for the player to pick a piece.
@@ -74,6 +89,10 @@ export function LocalGamePage({ initialRules, onExit, bot, kicker }: LocalGamePa
       const wait = Math.max(0, BOT_MIN_THINK_MS - (performance.now() - started));
       window.setTimeout(() => {
         if (cancelled || !action) return;
+        if (action.moveId === PASS_MOVE_ID) {
+          endTurn();
+          return;
+        }
         const move = legalMoves.find((candidate) => candidate.id === action.moveId);
         if (move) playMove(move);
       }, wait);
@@ -90,13 +109,25 @@ export function LocalGamePage({ initialRules, onExit, bot, kicker }: LocalGamePa
   }, [phase, winner, humanPlayer]);
 
   function playMove(move: Move) {
-    const nextState = applyMove(state, move.id);
+    const nextState = applyMove(state, move.id, dice);
     setPieceAnimation(
       moveAnimation(move, { id: state.moveLog.length + 1, pieceId: move.pieceId, perspective, direction: "from" })
     );
     playSound(soundForMove(nextState.moveLog[nextState.moveLog.length - 1]));
     setHistory((currentHistory) => [...currentHistory, nextState]);
+    // A Sadist that may move again stays selected.
+    setSelectedPieceId(nextState.extraMove && !isBotTurn ? nextState.extraMove.pieceId : null);
+    setInspectedPieceId(null);
+    setPromotion(null);
+  }
+
+  // Declines a Sadist's extra move.
+  function endTurn() {
+    if (!canPass(state)) return;
+    const nextState = applyMove(state, PASS_MOVE_ID, dice);
+    setHistory((currentHistory) => [...currentHistory, nextState]);
     setSelectedPieceId(null);
+    setInspectedPieceId(null);
     setPromotion(null);
   }
 
@@ -116,10 +147,12 @@ export function LocalGamePage({ initialRules, onExit, bot, kicker }: LocalGamePa
     const piece = getPieceAt(state, square);
     if (piece?.player === state.currentPlayer && movesByPiece.has(piece.id)) {
       setSelectedPieceId(piece.id === selectedPieceId ? null : piece.id);
+      setInspectedPieceId(null);
       return;
     }
 
     setSelectedPieceId(null);
+    setInspectedPieceId(piece && piece.id !== inspectedPieceId ? piece.id : null);
   }
 
   function undoMove() {
@@ -133,6 +166,7 @@ export function LocalGamePage({ initialRules, onExit, bot, kicker }: LocalGamePa
       return currentHistory.slice(0, target + 1);
     });
     setSelectedPieceId(null);
+    setInspectedPieceId(null);
     setPieceAnimation(null);
     setPromotion(null);
   }
@@ -149,6 +183,7 @@ export function LocalGamePage({ initialRules, onExit, bot, kicker }: LocalGamePa
   const ownName = bot ? getPlayerIdentity().name : "Player 1";
   const turnTitle = playing ? `${playerName(state.currentPlayer)} to move` : "Game over";
   const turnMessage = isBotTurn ? "The bot is thinking..." : getStateMessage(state, humanPlayer);
+  const mayEndTurn = !isBotTurn && canPass(state);
   // Against a bot, undo is only useful once the human has made a move.
   const canUndo = humanPlayer
     ? history.some((entry, index) => index < history.length - 1 && entry.currentPlayer === humanPlayer)
@@ -179,6 +214,9 @@ export function LocalGamePage({ initialRules, onExit, bot, kicker }: LocalGamePa
               setPieceAnimation((current) => (current?.id === animationId ? null : current))
             }
             onSquareClick={handleSquareClick}
+            pieceBadge={(piece) => conscienceBadge(state.minds[piece.id])}
+            squareClassName={(_square, piece) => conscienceSquareClass(state, piece)}
+            pieceStatus={(piece) => conscienceAria(state, piece)}
           />
 
           <PlayerBar
@@ -188,6 +226,8 @@ export function LocalGamePage({ initialRules, onExit, bot, kicker }: LocalGamePa
             state={state}
             active={playing && state.currentPlayer === perspective}
           />
+
+          <EventFeed state={state} />
         </div>
 
         <aside className="game-panel" aria-label="Game controls and move history">
@@ -202,7 +242,23 @@ export function LocalGamePage({ initialRules, onExit, bot, kicker }: LocalGamePa
             <SoundToggle />
           </header>
 
-          <TurnStatus state={state} title={turnTitle} message={turnMessage} />
+          <TurnStatus
+            state={state}
+            title={turnTitle}
+            message={turnMessage}
+            action={
+              mayEndTurn ? (
+                <button className="button secondary end-turn" type="button" onClick={endTurn} data-testid="end-turn">
+                  <SkipForward aria-hidden="true" size={16} />
+                  End turn
+                </button>
+              ) : null
+            }
+          />
+
+          <ConscienceNote state={state} pieceId={selectedPieceId ?? inspectedPieceId} />
+
+          <RuleSetChip ruleSet={state.rules.ruleSet} />
 
           <MoveList state={state} />
 
@@ -258,7 +314,7 @@ export function LocalGamePage({ initialRules, onExit, bot, kicker }: LocalGamePa
         />
       ) : null}
 
-      {dialog === "rules" ? <RulesDialog onClose={() => setDialog(null)} /> : null}
+      {dialog === "rules" ? <RulesDialog ruleSet={state.rules.ruleSet} onClose={() => setDialog(null)} /> : null}
     </main>
   );
 }
@@ -266,6 +322,7 @@ export function LocalGamePage({ initialRules, onExit, bot, kicker }: LocalGamePa
 function getStateMessage(state: GameState, humanPlayer: Player | null) {
   const { status } = state;
   if (status.phase !== "playing") return status.message;
+  if (state.extraMove) return "The Sadist may move again, or end the turn.";
   if (status.check) {
     return humanPlayer ? "You are in check. Get your king to safety." : `${playerName(state.currentPlayer)} is in check.`;
   }

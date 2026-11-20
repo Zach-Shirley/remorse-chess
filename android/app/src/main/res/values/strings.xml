@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Chess</string>
-    <string name="title_activity_main">Chess</string>
-    <string name="package_name">com.example.chessbase</string>
-    <string name="custom_url_scheme">com.example.chessbase</string>
+    <string name="app_name">Remorse Chess</string>
+    <string name="title_activity_main">Remorse Chess</string>
+    <string name="package_name">com.example.remorsechess</string>
+    <string name="custom_url_scheme">com.example.remorsechess</string>
 </resources>

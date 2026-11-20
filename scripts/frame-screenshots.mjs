@@ -5,8 +5,7 @@ import sharp from "sharp";
 const W = 1320;
 const H = 2868;
 const CAPTIONS = {
-  // CHANGE-ME: each game writes its own first caption.
-  "1-home": ["Chess", "The classic game, beautifully made"],
+  "1-home": ["Remorse Chess", "Chess with a conscience"],
   "2-local-game": ["Pass & Play", "Two players, one phone"],
   "3-bot-game": ["Play the bot", "Easy, medium or hard. Works offline"],
   "4-online-room": ["Play a friend online", "Share a room code to start"],

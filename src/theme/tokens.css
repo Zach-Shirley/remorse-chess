@@ -1,38 +1,54 @@
 /* Design tokens. Everything visual in the app reads from here; a new game restyles by editing
    this file (and swapping the rendered art in src/assets). */
 :root {
-  /* Surfaces: near-black with a warm red cast */
-  --ink-0: #0a0607;
-  --ink-1: #110b0d;
-  --ink-2: #191113;
-  --ink-3: #231719;
-  --ink-4: #2f2023;
-  --glass: rgba(255, 240, 240, 0.045);
-  --glass-strong: rgba(255, 240, 240, 0.085);
-  --line: rgba(255, 228, 228, 0.1);
-  --line-strong: rgba(255, 228, 228, 0.2);
+  /* Surfaces: near-black with a cool violet cast (a dim confessional) */
+  --ink-0: #07060d;
+  --ink-1: #0d0b16;
+  --ink-2: #141120;
+  --ink-3: #1c182a;
+  --ink-4: #262138;
+  --glass: rgba(240, 238, 255, 0.045);
+  --glass-strong: rgba(240, 238, 255, 0.085);
+  --line: rgba(228, 224, 255, 0.1);
+  --line-strong: rgba(228, 224, 255, 0.2);
 
   /* Text */
-  --text: #f7f0ef;
-  --text-soft: #cdbfbf;
-  --text-mute: #948487;
+  --text: #f3f1f9;
+  --text-soft: #c4bfd4;
+  --text-mute: #8c879e;
 
   /* Brand and signals */
-  --crimson: #d92b3a;
-  --crimson-bright: #f24f5b;
-  --crimson-deep: #8a1221;
-  --crimson-glow: rgba(217, 43, 58, 0.38);
+  --accent: #7054e0;
+  --accent-bright: #a08bf8;
+  --accent-deep: #3f2a99;
+  --accent-glow: rgba(112, 84, 224, 0.38);
   /* Amber is reserved for "your attention here": the side to move, selections, legal moves. */
   --amber: #f6b740;
   --amber-soft: rgba(246, 183, 64, 0.2);
   --ok: #54d394;
   --warn: #ff8f6b;
 
+  /* Consciences: one colour per status token (see src/ui/Conscience.tsx). */
+  --guilt: #8f7bf2;
+  --guilt-ink: #120c2e;
+  --devastated: #ff7a59;
+  --devastated-ink: #2b0d05;
+  --sadist: #e5364b;
+  --sadist-ink: #fff1f2;
+  --bloodlust: #ff9a2e;
+  --bloodlust-ink: #2c1200;
+  --unaffected: #9a97a8;
+  --unaffected-ink: #15131d;
+  --vendetta: #f5f2ea;
+  --vendetta-ink: #17141f;
+  --absolved: #f6d77a;
+  --absolved-ink: #2a1f00;
+
   /* Board (keep in step with art/board.mjs) */
   --board-light: #d4c4a4;
   --board-dark: #476078;
-  --board-frame-top: #24121a;
-  --board-frame-bottom: #0d0709;
+  --board-frame-top: #1a1630;
+  --board-frame-bottom: #08070f;
   --side-white: #efe3cb;
   --side-black: #25262c;
   /* Check: the king's square glows in this colour. */

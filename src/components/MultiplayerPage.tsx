@@ -13,6 +13,7 @@ import {
   MessageSquare,
   Radio,
   RotateCcw,
+  SkipForward,
   Swords,
   Trophy,
   WifiOff,
@@ -20,6 +21,8 @@ import {
 } from "lucide-react";
 import {
   DEFAULT_GAME_RULES,
+  PASS_MOVE_ID,
+  canPass,
   getLegalMoves,
   getPieceAt,
   opponentOf,
@@ -47,6 +50,17 @@ import { playSound, soundForMove } from "../sound";
 import { Board, groupMovesByPiece, moveAnimation, movesTo } from "../ui/Board";
 import { BotLevelPicker } from "../ui/BotLevelPicker";
 import { ColorPicker, resolveColorChoice } from "../ui/ColorPicker";
+import {
+  ConscienceNote,
+  EventFeed,
+  RuleSetChip,
+  RuleSetPicker,
+  conscienceAria,
+  conscienceBadge,
+  conscienceSquareClass,
+  ruleSetLabel,
+  useRuleSetChoice
+} from "../ui/Conscience";
 import { MoveList, PlayerBar, RulesDialog, SoundToggle, TurnStatus } from "../ui/GameChrome";
 import { resultTitle } from "../ui/GameOverDialog";
 import { Modal } from "../ui/Modal";
@@ -54,7 +68,7 @@ import { pieceSprite, type PieceAnimation } from "../ui/PieceToken";
 import { PromotionPicker } from "../ui/PromotionPicker";
 import { LocalGamePage } from "./LocalGamePage";
 
-const SESSION_KEY = "chess-base:online-session:v1";
+const SESSION_KEY = "remorse-chess:online-session:v1";
 
 type LobbyMode = "create" | "join";
 type GameDialog = "rules" | "resign" | "leave" | null;
@@ -341,8 +355,10 @@ function MultiplayerLobby({
 }) {
   const [mode, setMode] = useState<LobbyMode>("create");
   const [code, setCode] = useState("");
-  // Plain chess has no rule options. A variant keeps its options in state here.
-  const rules = DEFAULT_GAME_RULES;
+  // One picker for both cards: a new room is created with it, and quick match only pairs
+  // players who picked the same rule set.
+  const [ruleSet, setRuleSet] = useRuleSetChoice();
+  const rules: GameRules = { ruleSet };
   const [botLevel, setBotLevel] = useState<BotLevel>("medium");
   const [roomColor, setRoomColor] = useState<ColorChoice>("random");
   const [botColor, setBotColor] = useState<ColorChoice>("white");
@@ -365,7 +381,7 @@ function MultiplayerLobby({
           </div>
           <p className="section-kicker">Quick match</p>
           <h1>Looking for a player</h1>
-          <p>You will be matched with the next player who searches.</p>
+          <p>You will be matched with the next player who searches for {ruleSetLabel(ruleSet)} rules.</p>
           <div className="queue-bot">
             <strong>Play a bot meanwhile?</strong>
             <BotLevelPicker value={botLevel} onChange={setBotLevel} />
@@ -413,6 +429,11 @@ function MultiplayerLobby({
         </p>
 
         {error ? <p className="lobby-error" role="alert">{error}</p> : null}
+
+        <div className="lobby-rules">
+          <span className="field-caption">Rule set · for a new room and for quick match</span>
+          <RuleSetPicker value={ruleSet} onChange={setRuleSet} />
+        </div>
 
         <div className="lobby-cards">
           <div className="lobby-card">
@@ -472,7 +493,7 @@ function MultiplayerLobby({
               <Zap aria-hidden="true" size={18} />
               <h2>Quick match</h2>
             </div>
-            <p>Pair with the next player who searches. Sides are random, and you can play a bot while you wait.</p>
+            <p>Pair with the next player who searches with the same rule set. Sides are random, and you can play a bot while you wait.</p>
             <button
               className="button secondary"
               type="button"
@@ -528,6 +549,7 @@ function WaitingRoom({
         <p className="section-kicker">Private room</p>
         <h1 id="waiting-title">Waiting for an opponent</h1>
         <p className="waiting-copy">Share this code with your opponent. They choose Join room and enter it. You play {ownSide}.</p>
+        <RuleSetChip ruleSet={snapshot.rules.ruleSet} />
 
         <button className="room-code-display" type="button" onClick={copyCode} title="Copy room code">
           <span>{snapshot.code}</span>
@@ -576,6 +598,8 @@ function OnlineGame({
   onLeave: () => void;
 }) {
   const [selectedPieceId, setSelectedPieceId] = useState<string | null>(null);
+  // A piece the player tapped only to read its status.
+  const [inspectedPieceId, setInspectedPieceId] = useState<string | null>(null);
   const [pieceAnimation, setPieceAnimation] = useState<PieceAnimation | null>(null);
   const [displayState, setDisplayState] = useState(snapshot.game);
   const [dialog, setDialog] = useState<GameDialog>(null);
@@ -677,11 +701,23 @@ function OnlineGame({
   function playMove(move: Move) {
     setPromotion(null);
     setSelectedPieceId(null);
+    setInspectedPieceId(null);
     request((ack) => socket.emit("room:move", move.id, ack));
   }
 
+  // Declines a Sadist's extra move. The server checks it like any other move.
+  function endTurn() {
+    setSelectedPieceId(null);
+    request((ack) => socket.emit("room:move", PASS_MOVE_ID, ack));
+  }
+
   function handleSquareClick(square: Square) {
-    if (pieceAnimation || !connected || !opponentConnected || !playing || state.currentPlayer !== session.player) return;
+    if (pieceAnimation || !connected || !opponentConnected || !playing || state.currentPlayer !== session.player) {
+      // Not this player's move: a tap still reads a piece's status.
+      const tapped = getPieceAt(displayState, square);
+      setInspectedPieceId(tapped && tapped.id !== inspectedPieceId ? tapped.id : null);
+      return;
+    }
 
     const destinationMoves = movesTo(selectedMoves, square);
     if (destinationMoves.length > 1) {
@@ -696,13 +732,17 @@ function OnlineGame({
     const piece = getPieceAt(displayState, square);
     if (piece?.player === session.player && movesByPiece.has(piece.id)) {
       setSelectedPieceId(piece.id === selectedPieceId ? null : piece.id);
+      setInspectedPieceId(null);
       return;
     }
 
     setSelectedPieceId(null);
+    setInspectedPieceId(piece && piece.id !== inspectedPieceId ? piece.id : null);
   }
 
   const statusMessage = getOnlineStatusMessage(state, session.player, connected, opponentConnected);
+  const mayEndTurn =
+    !pieceAnimation && connected && opponentConnected && state.currentPlayer === session.player && canPass(state);
   const ownRematchVote = snapshot.rematchVotes.includes(session.player);
   const opponentRematchVote = snapshot.rematchVotes.includes(opponent);
   const opponentName = snapshot.players[opponent]?.name ?? playerName(opponent);
@@ -734,6 +774,9 @@ function OnlineGame({
             animation={pieceAnimation}
             onAnimationEnd={finishPieceAnimation}
             onSquareClick={handleSquareClick}
+            pieceBadge={(piece) => conscienceBadge(displayState.minds[piece.id])}
+            squareClassName={(_square, piece) => conscienceSquareClass(displayState, piece)}
+            pieceStatus={(piece) => conscienceAria(displayState, piece)}
           />
 
           <PlayerBar
@@ -744,6 +787,8 @@ function OnlineGame({
             active={playing && state.currentPlayer === session.player}
             offline={!connected}
           />
+
+          <EventFeed state={state} />
 
           <GameEventOverlay
             snapshot={snapshot}
@@ -773,7 +818,19 @@ function OnlineGame({
             state={state}
             title={!playing ? "Game over" : state.currentPlayer === session.player ? "Your move" : `${opponentName} to move`}
             message={statusMessage}
+            action={
+              mayEndTurn ? (
+                <button className="button secondary end-turn" type="button" onClick={endTurn} data-testid="end-turn">
+                  <SkipForward aria-hidden="true" size={16} />
+                  End turn
+                </button>
+              ) : null
+            }
           />
+
+          <ConscienceNote state={displayState} pieceId={selectedPieceId ?? inspectedPieceId} />
+
+          <RuleSetChip ruleSet={state.rules.ruleSet} />
 
           <MoveList state={state} />
 
@@ -817,7 +874,7 @@ function OnlineGame({
 
       {error ? <div className="game-toast" role="alert">{error}</div> : null}
 
-      {dialog === "rules" ? <RulesDialog onClose={() => setDialog(null)} /> : null}
+      {dialog === "rules" ? <RulesDialog ruleSet={state.rules.ruleSet} onClose={() => setDialog(null)} /> : null}
 
       {promotion && dialog === null ? (
         <PromotionPicker moves={promotion} onPick={playMove} onCancel={() => setPromotion(null)} />
@@ -1033,7 +1090,11 @@ function getOnlineStatusMessage(state: GameState, player: Player, connected: boo
   if (!connected) return "Reconnecting to the game server...";
   if (!opponentConnected) return "Waiting for your opponent to reconnect.";
   if (state.status.phase !== "playing") return state.status.message;
-  if (state.currentPlayer !== player) return state.status.check ? "Check! Waiting for your opponent." : "Waiting for your opponent.";
+  if (state.currentPlayer !== player) {
+    if (state.extraMove) return "Your opponent's Sadist may move again.";
+    return state.status.check ? "Check! Waiting for your opponent." : "Waiting for your opponent.";
+  }
+  if (state.extraMove) return "Your Sadist may move again, or end the turn.";
   if (state.status.check) return "You are in check. Get your king to safety.";
   return "Select a piece to make a move.";
 }

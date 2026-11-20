@@ -14,4 +14,4 @@ services:
         # capacitor://localhost and https://localhost are the iOS and Android app shells.
         # The first origin is the web app. It is a guess until the site is deployed: correct it
         # to the real URL then.
-        value: https://remorse-chess.vercel.app,capacitor://localhost,https://localhost
+        value: https://remorse-chess-five.vercel.app,capacitor://localhost,https://localhost

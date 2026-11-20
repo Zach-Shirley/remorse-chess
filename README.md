@@ -6,7 +6,7 @@ The variant is by **Bardelo Bardalini**, who published it in five YouTube Shorts
 
 **Status: complete, deployed and playable.** Nothing has been played on a real phone or by real opponents yet.
 
-**Play it:** https://remorse-chess.vercel.app
+**Play it:** https://remorse-chess-five.vercel.app
 
 The first online connection can take up to a minute: the multiplayer server runs on a free tier and sleeps when nobody is playing. Pass & Play and the bot work instantly and offline.
 
